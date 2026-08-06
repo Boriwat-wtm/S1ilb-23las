@@ -1,7 +1,7 @@
-# Bank — บัญชีรายจ่ายสองคน
+# Bank — สมุดบัญชีส่วนตัว แชร์ได้
 
-แอปบันทึกรายจ่ายร่วมสำหรับสองคน อัปโหลดสลิป → กรอก/แก้ → ดูสรุปรายเดือน
-ติดตั้งบนมือถือเป็น PWA
+สมุดบันทึกเงินหลายเล่ม แต่ละเล่มเป็นส่วนตัวจนกว่าจะเชิญคนอื่นเข้ามา
+มีทั้งสมุดรายรับ–รายจ่าย และสมุดยอดหนี้ ติดตั้งบนมือถือเป็น PWA
 
 ```
 React (Vercel)  ──HTTPS──▶  FastAPI (Render)  ──▶  Postgres (Neon)
@@ -18,35 +18,53 @@ React (Vercel)  ──HTTPS──▶  FastAPI (Render)  ──▶  Postgres (Neo
 
 ---
 
-## สถานะ
+## โครงสร้าง
 
-| Phase | สถานะ |
+**ผู้ใช้หนึ่งคนมีได้หลายสมุด** สมุดเป็นส่วนตัว 100% จนกว่าเจ้าของจะเชิญคนอื่นด้วย username
+คนที่ถูกเชิญได้สิทธิ์อย่างใดอย่างหนึ่ง:
+
+| สิทธิ์ | ทำอะไรได้ |
 |---|---|
-| 0 — สมัคร Vercel / Render / Neon / Supabase | 🔲 ต้องทำเอง |
-| 1 — Schema + Backend | ✅ |
-| 3 — Frontend | ✅ |
-| 4 — PWA | ✅ |
-| 5 — Deploy | 🔲 config พร้อมแล้ว ทำตาม runbook ข้างล่าง |
-| 2 — OCR | ⏸️ พักไว้ ใช้ Google Vision ทีหลัง (seam ทำไว้แล้ว) |
-| 6 — ทดสอบก่อนใช้จริง | 🔲 |
-| 7 — ติดตั้งบนมือถือ | 🔲 |
-| 8 — เฝ้าระวังหลังใช้จริง | 🔲 |
+| `owner` | ทุกอย่าง รวมถึงเชิญ/ถอดสมาชิก เปลี่ยนตั้งค่า ลบสมุด |
+| `editor` | ดูและเพิ่ม/แก้/ลบรายการ แต่จัดการสมาชิกไม่ได้ |
+| `viewer` | ดูอย่างเดียว |
+
+**สมุดสองประเภทใช้ entry model เดียวกัน** เพราะเป็นคณิตศาสตร์ตัวเดียวกัน:
+
+| ประเภท | `in` | `out` | `ยอด = Σin − Σout` |
+|---|---|---|---|
+| `cashflow` | รายรับ | รายจ่าย | คงเหลือ |
+| `debt` | หนี้เพิ่ม | จ่ายคืน | ยอดคงค้าง |
+
+ต่างแค่ป้ายชื่อกับว่าจะอ่านยอดรายเดือนหรือยอดสะสม — ไม่มี branch ใน write path
 
 ---
 
 ## การตัดสินใจที่ล็อกไว้แล้ว
 
-**รูปสลิปเก็บที่ Supabase Storage แบบ private bucket** — ไม่ใช่ใน Postgres (DB บวมชน quota) และไม่ใช่ Cloudinary (free tier เป็น public URL ไม่มี auth ส่วนสลิปมีชื่อ เลขบัญชีบางส่วน ยอดเงิน) เก็บแค่ object path ใน DB แล้วออก signed URL อายุสั้นตอนขอดู
+**ไม่ใช่สมาชิก = 404 ไม่ใช่ 403** — 403 จะยืนยันว่า ledger id นั้นมีอยู่จริง ซึ่งพอจะไล่เดาสมุดคนอื่นได้
+สมุดที่ไม่มีอยู่กับสมุดที่คุณมองไม่เห็น ต้องแยกจากกันไม่ออก
 
-**รูปถูกย่อและถอด metadata ก่อนอัปโหลดเสมอ** — ย่อด้านยาวเหลือ 1200px, JPEG q75 ได้ประมาณ 100KB/ใบ การ re-encode ทิ้ง EXIF (รวม GPS) ไปในตัว ~100 ใบ/เดือน ≈ 10MB/เดือน
+**ทุก route ที่แตะสมุดผ่าน `LedgerRead` / `LedgerWrite` / `LedgerAdmin`** — การหาสมุดกับการเช็คสิทธิ์เป็น query เดียวกัน route จึงลืมเช็คไม่ได้ ไม่ใช่ว่าลืมแล้วยังทำงานผิดๆ ได้
+
+**`slip_ref` unique ต่อสมุด ไม่ใช่ทั้งระบบ** — ถ้า unique ทั้งระบบ 409 จะบอกใบ้ว่าสลิปที่คุณถืออยู่มีคนลงไว้แล้วในสมุดที่คุณมองไม่เห็น
+
+**หมวดหมู่ copy เข้าสมุดแต่ละเล่ม ไม่แชร์กัน** — ไม่งั้นหมวดหมู่ที่คนหนึ่งตั้งเองจะไปโผล่ในสมุดส่วนตัวของอีกคน
+
+**สีบอกทิศทางของเงิน ไม่ใช่ดี/แย่** — ในสมุดหนี้ "เงินเข้า" คือหนี้เพิ่ม เขียว=ดี แดง=แย่ จึงผิดตั้งแต่ต้น
+`--credit` / `--debit` แปลว่า credit/debit เฉยๆ และทุกจำนวนเงินมี `+` หรือ `−` เสมอ — สีเป็นช่องทางที่สอง ไม่ใช่ช่องทางเดียว
+
+**รูปสลิปเก็บที่ Supabase private bucket** — ไม่ใช่ใน Postgres (DB บวมชน quota) และไม่ใช่ Cloudinary (free tier เป็น public URL ไม่มี auth) เก็บแค่ object path ใน DB ออก signed URL อายุสั้นตอนขอดู
+รูปถูกย่อเหลือด้านยาว 1200px + JPEG q75 ก่อนอัปโหลดเสมอ (~100KB) การ re-encode ทิ้ง EXIF/GPS ไปในตัว
 
 **OCR ไม่เคยอยู่บน critical path** — ฟอร์มคือ source of truth เสมอ อ่านสลิปไม่ออกคือผลลัพธ์ปกติ ไม่ใช่ error: API ตอบ 200 พร้อมช่องว่าง แล้วผู้ใช้กรอกเอง `app/ocr.py` มี timeout 15 วิ และ `extract()` ไม่มีทาง raise
 
-**QR บนสลิปไทยใช้กันลงซ้ำ ไม่ใช่ดึงยอด** — mini-QR บนสลิปโอนเก็บ *slip verification reference* (ธนาคารต้นทาง + เลขอ้างอิง) ไม่ได้เก็บจำนวนเงินหรือวันที่ ค่าจริงของมันคือเป็น unique key กันสองคนลงสลิปใบเดียวกัน (`transactions.slip_ref` UNIQUE) ยอดกับวันที่ยังต้องมาจาก OCR อยู่ดี
+**QR บนสลิปไทยใช้กันลงซ้ำ ไม่ใช่ดึงยอด** — mini-QR บนสลิปโอนเก็บ *slip verification reference* (ธนาคารต้นทาง + เลขอ้างอิง) ไม่ได้เก็บจำนวนเงินหรือวันที่
 
-**แก้พร้อมกัน = optimistic locking** — ทุกแถวมี `version` client ส่ง version ที่อ่านมากลับไปตอน PUT ไม่ตรงได้ 409 พร้อมบอก version ปัจจุบัน แทนที่จะทับงานอีกฝ่ายเงียบๆ
+**แก้พร้อมกัน = optimistic locking** — ทุกแถวมี `version` ส่ง version ที่อ่านมากลับไปตอน PUT ไม่ตรงได้ 409 พร้อมบอก version ปัจจุบัน แทนที่จะทับงานคนอื่นเงียบๆ
 
-**ไม่มี SQLite ใน dev** — ต่อ Neon ตรงตั้งแต่วันแรก ไม่ต้องมาไล่ syntax ต่างทีหลัง (SQLite โผล่แค่ใน `tests/smoke.py` ในฐานะ harness ดูข้อจำกัดในไฟล์)
+**signup เปิดสาธารณะ** — เพื่อให้เชิญใครก็ได้ด้วย username โดยเจ้าของไม่ต้องไปยุ่งกับรหัสผ่านของเขา
+เบรกคือ rate limit ต่อ IP ใน `app/ratelimit.py` ซึ่งเก็บ counter ใน process เดียว รีเซ็ตทุกครั้งที่ deploy และแชร์ข้าม instance ไม่ได้ — Render free มี instance เดียวพอดี ข้อแลกเปลี่ยนนี้ใช้ได้ที่นี่ที่เดียว
 
 ---
 
@@ -55,29 +73,26 @@ React (Vercel)  ──HTTPS──▶  FastAPI (Render)  ──▶  Postgres (Neo
 ลำดับสำคัญ เพราะ Render ต้องรู้โดเมน Vercel และ Vercel ต้องรู้ URL ของ Render — ไก่กับไข่ ต้องเดินสองรอบ
 
 ### 1. Neon
-สร้าง project → เลือก region **Singapore** → คัดลอก **pooled connection string** (`...-pooler...`) เก็บไว้
+สร้าง project → region **Singapore** → คัดลอก **pooled connection string** (`...-pooler...`)
 
-### 2. Supabase (เก็บรูปสลิปอย่างเดียว ไม่ได้ใช้ DB ของมัน)
+### 2. Supabase (ใช้แค่ Storage ไม่ได้ใช้ DB ของมัน)
 สร้าง project → **Storage → New bucket** ชื่อ `slips` → **ปิด Public bucket ให้แน่ใจ**
-เอา **Project URL** กับ **service_role key** (Settings → API) เก็บไว้ — service_role ข้าม RLS ได้ ห้ามหลุดไปฝั่ง frontend เด็ดขาด
+เอา **Project URL** กับ **service_role key** (Settings → API) — service_role ข้าม RLS ได้ ห้ามหลุดไปฝั่ง frontend
 
-### 3. เตรียมฐานข้อมูล (รันจากเครื่องตัวเอง ยิงตรงไป Neon)
-Render free ไม่มี shell เลยต้อง seed จากเครื่อง
+### 3. สร้างตารางใน Neon (รันจากเครื่องตัวเอง)
+Render free ไม่มี shell
 
 ```bash
 cd backend
 python -m venv .venv && .venv/Scripts/activate
 pip install -r requirements.txt
-DATABASE_URL="<neon-connection-string>" \
-SEED_USERS="boriwat:บอ:รหัสของคุณ,fon:ฝน:รหัสของแฟน" \
-  python -m scripts.seed
+DATABASE_URL="<neon-connection-string>" python -m scripts.seed --tables-only
 ```
 
-สร้างตาราง + 2 users + 10 หมวดหมู่ + keyword ประมาณ 90 คำ รันซ้ำได้ไม่ทับของเดิม
+ไม่ต้อง seed ผู้ใช้ — สมัครผ่านหน้าเว็บได้เลย
 
 ### 4. Render
-New → **Blueprint** → เลือก repo นี้ (มันอ่าน `render.yaml` เอง)
-ใส่ env var ที่ marked `sync: false`:
+New → **Blueprint** → เลือก repo นี้ (อ่าน `render.yaml` เอง) → ใส่ env var ที่ `sync: false`:
 
 | key | ค่า |
 |---|---|
@@ -86,73 +101,63 @@ New → **Blueprint** → เลือก repo นี้ (มันอ่าน 
 | `SUPABASE_URL` | Project URL |
 | `SUPABASE_SERVICE_KEY` | service_role key |
 
-`JWT_SECRET` Render สุ่มให้เอง
-Deploy เสร็จ เปิด `https://<ชื่อ>.onrender.com/health` ต้องได้ `"database":"ok"`
+`JWT_SECRET` Render สุ่มให้เอง — Deploy เสร็จเปิด `/health` ต้องได้ `"database":"ok"`
 
 ### 5. Vercel
-Import repo → **Root Directory = `frontend`** (สำคัญ ไม่งั้น build ไม่เจอ)
-Environment Variable: `VITE_API_URL` = URL ของ Render (ไม่มี `/` ปิดท้าย)
-Deploy → จด production domain ไว้
+Import repo → **Root Directory = `frontend`** (สำคัญ) → env `VITE_API_URL` = URL ของ Render (ไม่มี `/` ปิดท้าย)
 
-> `VITE_*` ถูก inline ตอน build ไม่ใช่ตอน run — แก้ค่าแล้วต้อง **Redeploy** ถึงจะมีผล
+> `VITE_*` ถูก inline ตอน build ไม่ใช่ตอน run — แก้ค่าแล้วต้อง **Redeploy**
 
 ### 6. กลับไป Render
-แก้ `CORS_ORIGINS` เป็นโดเมน Vercel จริง เช่น `https://bank-xxxx.vercel.app` → save (Render redeploy เอง)
+แก้ `CORS_ORIGINS` เป็นโดเมน Vercel จริง → save
 
-> preview deployment ของ Vercel ใช้โดเมนคนละอันทุกครั้ง จะติด CORS ถ้าไม่ได้ใส่ไว้ด้วย ใช้ production domain เป็นหลัก
+> preview deployment ของ Vercel ใช้โดเมนคนละอันทุกครั้ง จะติด CORS ถ้าไม่ได้ใส่ไว้ด้วย
 
-### 7. ทดสอบ
-เปิดโดเมน Vercel บนคอม → เปิด DevTools Console → login
-ถ้าเจอ CORS error แปลว่าข้อ 6 ยังไม่ตรง ถ้าค้างที่หน้าปลุกนานๆ แปลว่า Render กำลัง cold start (ปกติรอบแรก 30–60 วิ)
-
-### 8. ติดตั้งบนมือถือ
-Safari → เปิดโดเมน Vercel → Share → **Add to Home Screen** ทำทั้งสองเครื่อง
+### 7–8. ทดสอบแล้วติดตั้ง
+เปิดโดเมน Vercel บนคอม เช็ค Console ว่าไม่มี CORS error → Safari บนมือถือ → Share → **Add to Home Screen**
 
 ---
 
 ## Backend
 
-### รันในเครื่อง
-
 ```bash
 cd backend
-python -m venv .venv
-.venv/Scripts/activate          # Windows;  source .venv/bin/activate บน mac/linux
+python -m venv .venv && .venv/Scripts/activate
 pip install -r requirements.txt
+cp .env.example .env            # เติม DATABASE_URL + JWT_SECRET
 
-cp .env.example .env            # แล้วเติม DATABASE_URL จาก Neon + JWT_SECRET
-python -m scripts.seed
-
+python -m scripts.seed --demo   # ผู้ใช้+สมุดตัวอย่างสำหรับ dev
 uvicorn app.main:app --reload   # http://localhost:8000/docs
 ```
-
-เปลี่ยนรหัสผ่านทีหลัง: `python -m scripts.seed --reset-password boriwat=รหัสใหม่`
 
 ### เทสต์
 
 ```bash
-python -m tests.smoke          # 65 checks — ทั้ง API บน SQLite ชั่วคราว ไม่ต้องต่ออะไร
+python -m tests.smoke          # 126 checks — ทั้ง API บน SQLite ชั่วคราว
 python -m tests.test_timeutil  # 25 checks — คณิตศาสตร์ timezone
 ```
+
+`tests/smoke.py` เน้นหนักที่ isolation: คนนอกอ่าน/เขียน/ลิสต์/ใช้ category/ขอ signed URL/จัดการสมาชิกไม่ได้ และ entry id ข้ามสมุดไม่ได้
 
 ### Endpoints
 
 | | |
 |---|---|
-| `GET /health` | ปลุก Render + warm Neon ในครั้งเดียว ตอบ 200 เสมอ บอกสถานะ db/storage ใน body |
-| `POST /auth/login` · `GET /auth/me` · `GET /auth/users` | JWT อายุ 30 วัน |
-| `GET /categories` · `GET /categories/suggest?text=` | เดาหมวดหมู่จากตาราง keyword |
-| `GET/POST /transactions` · `GET/PUT/DELETE /transactions/{id}` | PUT ต้องส่ง `version` |
-| `GET /transactions/summary?month=YYYY-MM` | ยอดรวม + แยกตามหมวด/ตามคน |
-| `GET /transactions/export.csv` | สำรองข้อมูล (UTF-8 BOM เปิดใน Excel ไทยไม่เพี้ยน) |
-| `GET /transactions/{id}/slip` | signed URL อายุสั้น |
-| `POST /slips/upload` | อัปโหลด + พยายามอ่าน — อ่านไม่ออกก็ยัง 200 |
+| `GET /health` | ปลุก Render + warm Neon ในครั้งเดียว ตอบ 200 เสมอ บอกสถานะใน body |
+| `POST /auth/register` · `POST /auth/login` · `GET /auth/me` | JWT อายุ 30 วัน |
+| `GET/POST /ledgers` · `GET/PATCH/DELETE /ledgers/{id}` | |
+| `GET/POST /ledgers/{id}/members` · `PATCH/DELETE .../{member_id}` | เชิญด้วย username |
+| `GET/POST /ledgers/{id}/categories` · `GET .../suggest?text=` | แยกตามสมุด |
+| `GET/POST /ledgers/{id}/entries` · `GET/PUT/DELETE .../{entry_id}` | PUT ต้องส่ง `version` |
+| `GET /ledgers/{id}/entries/summary?month=` | `period` + `lifetime` |
+| `GET /ledgers/{id}/entries/export.csv` | UTF-8 BOM, ป้ายคำเปลี่ยนตามประเภทสมุด |
+| `GET /ledgers/{id}/entries/{id}/slip` · `POST /ledgers/{id}/slips/upload` | |
 
 ### Timezone
 
-เก็บเป็น UTC (`TIMESTAMPTZ`) ทั้งหมด แสดงผลและกรองด้วย `Asia/Bangkok`
+เก็บ UTC (`TIMESTAMPTZ`) แสดงผลและกรองด้วย `Asia/Bangkok`
 Render กับ Neon เป็น UTC — รายการที่ลงตอนเที่ยงคืนถึงตี 7 จะตกไปเป็นวัน UTC ก่อนหน้า ซึ่งเป็นวิธีที่ dashboard กรองรายเดือนแล้วแถวหายเงียบๆ
-`app/timeutil.py` เลยคำนวณขอบเขตเป็นเวลาไทยก่อนแล้วค่อยแปลงเป็น UTC instant (ได้ใช้ index ด้วย ไม่ต้อง `AT TIME ZONE` รายแถว)
+`app/timeutil.py` คำนวณขอบเขตเป็นเวลาไทยก่อนแล้วแปลงเป็น UTC instant (ได้ใช้ index ด้วย)
 
 ---
 
@@ -165,31 +170,36 @@ cp .env.example .env.local      # ชี้ VITE_API_URL ไปที่ backend
 npm run dev                     # http://localhost:5173
 ```
 
-หน้าจอ: หน้าปลุก backend → login → รายการ (กรองตามเดือน/คน/หมวด/ค้นหา) → เพิ่ม/แก้ → สรุป + export CSV
+**Layout** — มือถือ: header + tab bar ล่าง · ตั้งแต่ 900px: tab bar ถูกแทนด้วย rail ซ้ายที่โชว์ทุกสมุดพร้อมยอด (recompose ไม่ใช่ย่อ)
 
-โครงสร้าง:
+**ตาราง vs รายการ** — สลับได้ที่ toolbar จำค่าไว้ใน localStorage
+คอลัมน์ **สะสม** ยึดจากยอดรวมที่ server คำนวณให้ของตัวกรองปัจจุบัน แล้วไล่ย้อนลงมาตามแถว (ใหม่→เก่า) จึงถูกต้องแม้โหลดมาแค่บางส่วน — ป้ายว่า "สะสม" ไม่ใช่ "คงเหลือ" เพราะเวลากรองเดือนอยู่ มันคือยอดสะสมภายในตัวกรองนั้น
 
 | ไฟล์ | หน้าที่ |
 |---|---|
 | `src/api/client.js` | fetch wrapper ตัวเดียว จัดการ token, 401, error shape |
-| `src/components/WakeScreen.jsx` | poll `/health` จน stack ตอบ แยก "Render ยังหลับ" กับ "Neon ยังตื่นไม่เต็มที่" |
-| `src/components/TransactionForm.jsx` | ใช้ร่วมกันทั้งหน้าเพิ่มและหน้าแก้ |
-| `src/utils/format.js` | เงิน/วันที่ ตรึงเป็น `Asia/Bangkok` ไม่อิง timezone ของเครื่อง |
+| `src/data/LedgerContext.jsx` | รายการสมุด + สมุดที่เปิดอยู่ (จำข้ามการรีโหลด) |
+| `src/components/Money.jsx` | ทุกจำนวนเงินผ่านตรงนี้ เพื่อให้มี +/− เสมอ |
+| `src/components/EntryTable.jsx` | ตารางพร้อมคอลัมน์สะสม |
+| `src/utils/format.js` | เวลาตรึงที่ `Asia/Bangkok` + `ledgerWords()` คำศัพท์ตามประเภทสมุด |
+| `src/styles.css` | token ทั้งหมด + เหตุผลของ 3 กติกาหลักอยู่หัวไฟล์ |
 
 ---
 
 ## ยังไม่ได้ทำ / ต้องระวัง
 
-- **ยังไม่ได้ยืนยัน datetime round-trip บน Postgres จริง** — SQLite แทน `TIMESTAMPTZ` ไม่ได้ (ทิ้ง offset เก็บเป็น local wall-clock text) เลข timezone เองเทสต์ครบใน `tests/test_timeutil.py` แล้ว แต่ตอนต่อ Neon ครั้งแรกให้ลงรายการตอนดึกๆ (เที่ยงคืน–ตี 7) หนึ่งรายการ แล้วเช็คว่าอยู่ถูกวันไหม
+- **ยังไม่ได้ยืนยัน datetime round-trip บน Postgres จริง** — SQLite แทน `TIMESTAMPTZ` ไม่ได้ (ทิ้ง offset เก็บเป็น local wall-clock text) เลข timezone เองเทสต์ครบใน `tests/test_timeutil.py` แต่ตอนต่อ Neon ครั้งแรกให้ลงรายการตอนดึกๆ (เที่ยงคืน–ตี 7) หนึ่งรายการ แล้วเช็คว่าอยู่ถูกวัน
 - **ยังไม่ได้ทดสอบบนมือถือจริง** — cold start, กล้อง, Add to Home Screen
-- **OCR ยังไม่ต่อ** — `OCR_PROVIDER=none` ทุกอย่างกรอกมือ พอจะต่อ Google Vision แก้ที่ `GoogleVisionProvider.extract()` ที่เดียว ไม่ต้องแตะ schema หรือ frontend
-- **ลบรายการแล้วรูปสลิปถูกลบแบบ best-effort** — ถ้า storage ล่มตอนนั้น จะเหลือไฟล์กำพร้าค้างไว้ (ยอมได้ ดีกว่าลบรายการไม่สำเร็จ)
-- **แก้สลิปออกจากรายการเดิม ไม่ลบไฟล์ใน bucket**
+- **OCR ยังไม่ต่อ** — `OCR_PROVIDER=none` พอจะต่อ Google Vision แก้ที่ `GoogleVisionProvider.extract()` ที่เดียว ไม่ต้องแตะ schema หรือ frontend
+- **signup เปิดสาธารณะ** — ใครก็สมัครได้ ควรจับตา quota Neon ถ้าเริ่มมีคนแปลกหน้าเข้ามา ถ้าอยากปิด ตัด `/auth/register` แล้วสร้างผู้ใช้ผ่าน `scripts/seed.py`
+- **เชิญแล้วเข้าเลย ไม่มีขั้นตอนตอบรับ** — คนถูกเชิญเห็นสมุดโผล่มาทันที (ออกเองได้)
+- **ลบรายการ/ลบสมุด → ลบไฟล์สลิปแบบ best-effort** — ถ้า storage ล่มตอนนั้นจะเหลือไฟล์กำพร้า (ยอมได้ ดีกว่าลบไม่สำเร็จ)
+- **เปลี่ยนประเภทสมุดทีหลังไม่ได้** — หมวดหมู่กับความหมายของ in/out ผูกกับมัน
 
 ## Backup
 
-`GET /transactions/export.csv` หรือปุ่มในหน้าสรุป ควร export เก็บเป็นระยะ ไม่ปล่อยให้ข้อมูลติดอยู่ใน Neon อย่างเดียว
+`GET /ledgers/{id}/entries/export.csv` หรือปุ่มในหน้าสรุป — export เก็บเป็นระยะ ไม่ปล่อยให้ข้อมูลติดอยู่ใน Neon อย่างเดียว
 
 ## เรื่อง quota
 
-Render free 750 ชม./เดือน — service เดียวรัน 24/7 กินประมาณ 730 ชม. ถ้าอยากตัดปัญหา cold start ด้วยการตั้ง cron ping `/health` ทุก 10 นาที ทำได้ แต่จะกินโควตาเกือบหมด เหลือที่ให้ service ฟรีตัวที่สองไม่ได้อีก
+Render free 750 ชม./เดือน — service เดียวรัน 24/7 กินประมาณ 730 ชม. ถ้าตั้ง cron ping `/health` ทุก 10 นาทีเพื่อตัดปัญหา cold start จะกินโควตาเกือบหมด เหลือที่ให้ service ฟรีตัวที่สองไม่ได้

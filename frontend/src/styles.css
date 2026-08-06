@@ -1061,6 +1061,29 @@ textarea::placeholder {
   width: 100%;
 }
 
+/* Filters are a disclosure on phones and always-on from 720px. The toggle and
+   the bar are the same markup either way, so keyboard order and aria-controls
+   hold at every width. */
+.filter-toggle {
+  display: none;
+}
+
+@media (max-width: 719px) {
+  .filter-toggle {
+    display: inline-block;
+  }
+
+  .filter-bar:not(.open) {
+    display: none;
+  }
+
+  /* A Thai month name plus a Buddhist year is long; give it its own line
+     rather than letting it squeeze the view switch. */
+  .month-pick {
+    flex: 1 1 100%;
+  }
+}
+
 /* ================================================ misc surfaces ======== */
 .panel {
   background: var(--surface);
@@ -1137,6 +1160,76 @@ textarea::placeholder {
 .rows .grow {
   flex: 1;
   min-width: 0;
+}
+
+/* Below 520px a member row cannot hold a name, a role select and a remove
+   button side by side without every one of them becoming a sliver. The name
+   takes the first line and the controls sit under it. */
+@media (max-width: 519px) {
+  .rows > li {
+    row-gap: var(--s2);
+  }
+
+  .rows .grow {
+    flex: 1 1 100%;
+  }
+}
+
+/* Navigation list — the mobile stand-in for the desktop rail. Row height is
+   held above 48px so each target clears the touch minimum. */
+.link-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--rule);
+}
+
+.link-list > li > a,
+.link-list > li > button {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  width: 100%;
+  min-height: 56px;
+  padding: var(--s3) var(--s1);
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.link-list > li > a:hover,
+.link-list > li > button:hover {
+  background: var(--surface);
+}
+
+.link-glyph {
+  width: 26px;
+  flex: none;
+  text-align: center;
+  font-size: 1.05rem;
+  color: var(--ink-2);
+}
+
+.link-title {
+  display: block;
+  font-weight: 550;
+}
+
+.link-caret {
+  color: var(--ink-3);
+  flex: none;
+}
+
+.static-field {
+  padding: 9px 11px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-control);
+  background: var(--surface-sunk);
+  color: var(--ink-2);
 }
 
 .bar-row {

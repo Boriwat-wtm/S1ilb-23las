@@ -97,6 +97,47 @@ check("no token -> 401", client.get("/auth/me").status_code == 401)
 check("garbage token -> 401", client.get(
     "/auth/me", headers={"Authorization": "Bearer nonsense"}).status_code == 401)
 
+print("\n== profile ==")
+r = client.patch("/auth/me", headers=BOW, json={"display_name": "  บอ (แก้ชื่อ)  "})
+check("update display name 200", r.status_code == 200, r.text)
+check("display name is trimmed", r.json()["display_name"] == "บอ (แก้ชื่อ)", r.text)
+check("username is unchanged", r.json()["username"] == "bow", r.text)
+check("blank display name -> 422", client.patch(
+    "/auth/me", headers=BOW, json={"display_name": "   "}).status_code == 422)
+check("profile update needs auth",
+      client.patch("/auth/me", json={"display_name": "x"}).status_code == 401)
+client.patch("/auth/me", headers=BOW, json={"display_name": "บอ"})
+
+print("\n== change password ==")
+# A second session for the same account, to prove the change reaches it.
+OTHER_DEVICE = auth(
+    client.post("/auth/login", json={"username": "bow", "password": "demo1234"})
+    .json()["access_token"]
+)
+check("the other device works before the change",
+      client.get("/auth/me", headers=OTHER_DEVICE).status_code == 200)
+
+check("wrong current password -> 400", client.post("/auth/password", headers=BOW, json={
+    "current_password": "wrong", "new_password": "newsecret1"}).status_code == 400)
+check("short new password -> 422", client.post("/auth/password", headers=BOW, json={
+    "current_password": "demo1234", "new_password": "abc"}).status_code == 422)
+check("reusing the same password -> 400", client.post("/auth/password", headers=BOW, json={
+    "current_password": "demo1234", "new_password": "demo1234"}).status_code == 400)
+
+r = client.post("/auth/password", headers=BOW, json={
+    "current_password": "demo1234", "new_password": "newsecret1"})
+check("change password 200", r.status_code == 200, r.text)
+BOW = auth(r.json()["access_token"])
+
+check("the caller stays signed in on its fresh token",
+      client.get("/auth/me", headers=BOW).status_code == 200)
+check("every other device is signed out",
+      client.get("/auth/me", headers=OTHER_DEVICE).status_code == 401)
+check("the old password no longer works", client.post(
+    "/auth/login", json={"username": "bow", "password": "demo1234"}).status_code == 401)
+check("the new one does", client.post(
+    "/auth/login", json={"username": "bow", "password": "newsecret1"}).status_code == 200)
+
 print("\n== ledgers ==")
 r = client.post("/ledgers", headers=BOW, json={
     "name": "ของฉัน", "kind": "cashflow", "emoji": "🔒"})

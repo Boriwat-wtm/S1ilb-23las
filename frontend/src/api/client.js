@@ -146,6 +146,12 @@ export const apiRegister = (username, display_name, password) =>
 
 export const apiMe = () => api('/auth/me')
 
+export const apiUpdateProfile = (display_name) =>
+  api('/auth/me', { method: 'PATCH', body: { display_name } })
+
+export const apiChangePassword = (current_password, new_password) =>
+  api('/auth/password', { method: 'POST', body: { current_password, new_password } })
+
 // --- ledgers ---------------------------------------------------------------
 export const apiLedgers = (includeArchived = false) =>
   api(`/ledgers${qs({ include_archived: includeArchived || '' })}`)

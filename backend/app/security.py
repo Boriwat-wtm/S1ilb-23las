@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from typing import Any
 
 import bcrypt
 import jwt
@@ -30,7 +31,7 @@ def create_access_token(user_id: int, username: str) -> tuple[str, datetime]:
     return token, expires_at
 
 
-def decode_access_token(token: str) -> dict | None:
+def decode_access_token(token: str) -> dict[str, Any] | None:
     try:
         return jwt.decode(
             token, settings.jwt_secret, algorithms=[settings.jwt_algorithm]

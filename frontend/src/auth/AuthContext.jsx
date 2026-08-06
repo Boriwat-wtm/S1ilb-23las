@@ -1,8 +1,10 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 
 import {
+  apiChangePassword,
   apiLogin,
   apiRegister,
+  apiUpdateProfile,
   clearSession,
   getStoredUser,
   getToken,
@@ -44,9 +46,25 @@ export function AuthProvider({ children }) {
     [adopt],
   )
 
+  const updateProfile = useCallback(async (displayName) => {
+    const updated = await apiUpdateProfile(displayName.trim())
+    // The stored copy feeds the topbar on the next cold start, so it has to
+    // move with the server's answer, not with what was typed.
+    storeSession(getToken(), updated)
+    setUser(updated)
+    return updated
+  }, [])
+
+  // Changing the password revokes every token, including this tab's. The
+  // server hands back a fresh one so the device doing the change stays in.
+  const changePassword = useCallback(
+    async (currentPassword, newPassword) => adopt(await apiChangePassword(currentPassword, newPassword)),
+    [adopt],
+  )
+
   const value = useMemo(
-    () => ({ user, login, register, logout }),
-    [user, login, register, logout],
+    () => ({ user, login, register, logout, updateProfile, changePassword }),
+    [user, login, register, logout, updateProfile, changePassword],
   )
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

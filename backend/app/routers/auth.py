@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -5,7 +7,14 @@ from sqlalchemy.exc import IntegrityError
 from ..deps import CurrentUser, DbSession
 from ..models import User
 from ..ratelimit import client_key, login_limiter, register_limiter
-from ..schemas import LoginRequest, RegisterRequest, TokenResponse, UserOut
+from ..schemas import (
+    LoginRequest,
+    PasswordChange,
+    ProfileUpdate,
+    RegisterRequest,
+    TokenResponse,
+    UserOut,
+)
 from ..security import create_access_token, hash_password, verify_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -65,3 +74,47 @@ def login(payload: LoginRequest, request: Request, db: DbSession) -> TokenRespon
 @router.get("/me", response_model=UserOut)
 def me(current_user: CurrentUser) -> UserOut:
     return UserOut.model_validate(current_user)
+
+
+@router.patch("/me", response_model=UserOut)
+def update_profile(
+    payload: ProfileUpdate, current_user: CurrentUser, db: DbSession
+) -> UserOut:
+    """Display name only. The username is what other people type to invite you,
+    so letting it change would silently break the invites already sent."""
+    current_user.display_name = payload.display_name
+    db.commit()
+    db.refresh(current_user)
+    return UserOut.model_validate(current_user)
+
+
+@router.post("/password", response_model=TokenResponse)
+def change_password(
+    payload: PasswordChange, request: Request, current_user: CurrentUser, db: DbSession
+) -> TokenResponse:
+    """Change the password and sign out every other device.
+
+    Rate limited on the same bucket as login, because this endpoint also
+    accepts a password guess and would otherwise be a way around that limit.
+
+    Stamping password_changed_at invalidates every token issued earlier — see
+    deps.get_current_user. A fresh token comes back in the response so the
+    device doing the change stays signed in.
+    """
+    login_limiter.check(client_key(request))
+
+    if not verify_password(payload.current_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="รหัสผ่านปัจจุบันไม่ถูกต้อง"
+        )
+    if payload.current_password == payload.new_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="รหัสผ่านใหม่ต้องไม่ซ้ำกับของเดิม"
+        )
+
+    current_user.password_hash = hash_password(payload.new_password)
+    current_user.password_changed_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(current_user)
+
+    return _issue(current_user)

@@ -10,6 +10,7 @@ exists, which is enough to enumerate other people's private books.
 """
 
 from dataclasses import dataclass
+from datetime import timezone
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
@@ -51,6 +52,28 @@ def get_current_user(
     user = db.get(User, int(payload["sub"]))
     if user is None:
         raise unauthorized
+
+    # Tokens issued before the last password change are dead.
+    #
+    # The tzinfo guard is not defensive padding. A naive datetime's
+    # .timestamp() is interpreted as *local* time, so on a UTC+7 machine the
+    # cutoff would land seven hours in the past and every stale token would
+    # sail through — a security check failing open, silently. Postgres hands
+    # back an aware value and this is a no-op; the guard means correctness does
+    # not depend on that.
+    #
+    # Both sides floor to whole seconds because PyJWT truncates `iat`; without
+    # it the token minted by a password change would fail its own check.
+    changed_at = user.password_changed_at
+    if changed_at.tzinfo is None:
+        changed_at = changed_at.replace(tzinfo=timezone.utc)
+    if int(payload.get("iat", 0)) < int(changed_at.timestamp()):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="รหัสผ่านถูกเปลี่ยนแล้ว กรุณาเข้าสู่ระบบใหม่",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     return user
 
 

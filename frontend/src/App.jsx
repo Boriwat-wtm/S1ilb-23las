@@ -5,6 +5,7 @@ import AppShell from './components/AppShell'
 import WakeScreen from './components/WakeScreen'
 import { useAuth } from './auth/AuthContext'
 import { LedgerProvider } from './data/LedgerContext'
+import AccountPage from './pages/AccountPage'
 import Entries from './pages/Entries'
 import EntryEdit from './pages/EntryEdit'
 import EntryNew from './pages/EntryNew'
@@ -12,6 +13,7 @@ import LedgerNew from './pages/LedgerNew'
 import LedgerSettings from './pages/LedgerSettings'
 import Login from './pages/Login'
 import MembersPage from './pages/MembersPage'
+import MorePage from './pages/MorePage'
 import SummaryPage from './pages/SummaryPage'
 
 export default function App() {
@@ -34,6 +36,8 @@ export default function App() {
           <Route path="summary" element={<SummaryPage />} />
           <Route path="members" element={<MembersPage />} />
           <Route path="settings" element={<LedgerSettings />} />
+          <Route path="account" element={<AccountPage />} />
+          <Route path="more" element={<MorePage />} />
           <Route path="ledgers/new" element={<LedgerNew />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

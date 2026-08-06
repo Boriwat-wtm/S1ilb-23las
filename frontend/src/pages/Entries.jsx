@@ -36,6 +36,9 @@ export default function Entries() {
       return 'list'
     }
   })
+  // Collapsed on phones, always open from 720px. Two rows of controls ahead of
+  // the data costs a third of a small screen before a single number is visible.
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const [query, setQuery] = useState(initialQuery)
   const [searchText, setSearchText] = useState('')
   const [page, setPage] = useState(null)
@@ -127,7 +130,10 @@ export default function Entries() {
   }
 
   const hasMore = page ? items.length < page.total : false
-  const filtersActive = Boolean(query.categoryId || query.createdById || query.direction || query.q)
+  const activeFilterCount = [query.categoryId, query.createdById, query.direction, query.q].filter(
+    Boolean,
+  ).length
+  const filtersActive = activeFilterCount > 0
   const totals = page?.totals
 
   return (
@@ -194,6 +200,7 @@ export default function Entries() {
 
       <div className="toolbar">
         <select
+          className="month-pick"
           value={query.month}
           onChange={(e) => setFilter({ month: e.target.value })}
           aria-label="เลือกเดือน"
@@ -214,6 +221,16 @@ export default function Entries() {
           </button>
         </div>
 
+        <button
+          type="button"
+          className="btn btn-sm filter-toggle"
+          onClick={() => setFiltersOpen((o) => !o)}
+          aria-expanded={filtersOpen}
+          aria-controls="entry-filters"
+        >
+          ตัวกรอง{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+        </button>
+
         <span className="spacer" />
 
         {canEdit && (
@@ -223,7 +240,10 @@ export default function Entries() {
         )}
       </div>
 
-      <div className="toolbar">
+      <div
+        id="entry-filters"
+        className={`toolbar filter-bar${filtersOpen ? ' open' : ''}`}
+      >
         <div className="grow">
           <input
             type="search"

@@ -137,6 +137,9 @@ export default function AppShell() {
             <NavLink to="/settings" className={railLink}>
               ตั้งค่าสมุด
             </NavLink>
+            <NavLink to="/account" className={railLink}>
+              บัญชีของฉัน
+            </NavLink>
             <button
               type="button"
               className="rail-nav-btn"
@@ -168,9 +171,12 @@ export default function AppShell() {
           <span className="tab-glyph" aria-hidden="true">▤</span>
           <span>สรุป</span>
         </NavLink>
-        <NavLink to="/members" className={tab}>
-          <span className="tab-glyph" aria-hidden="true">👥</span>
-          <span>สมาชิก</span>
+        {/* Four slots cannot hold members, ledger settings and account, so the
+            last one opens the list that does. Before this, ledger settings had
+            no route to it at all on a phone. */}
+        <NavLink to="/more" className={tab}>
+          <span className="tab-glyph" aria-hidden="true">⋯</span>
+          <span>เพิ่มเติม</span>
         </NavLink>
       </nav>
 

@@ -68,6 +68,30 @@ class TokenResponse(BaseModel):
     user: UserOut
 
 
+class ProfileUpdate(BaseModel):
+    display_name: str = Field(min_length=1, max_length=80)
+
+    @field_validator("display_name")
+    @classmethod
+    def strip_display_name(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("ต้องกรอกชื่อที่แสดง")
+        return v
+
+
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def strong_enough(cls, v: str) -> str:
+        if len(v) < MIN_PASSWORD_LEN:
+            raise ValueError(f"รหัสผ่านใหม่ต้องยาวอย่างน้อย {MIN_PASSWORD_LEN} ตัว")
+        return v
+
+
 # --------------------------------------------------------------------------
 # ledgers
 # --------------------------------------------------------------------------

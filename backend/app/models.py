@@ -62,6 +62,12 @@ class User(Base):
     username: Mapped[str] = mapped_column(String(32), unique=True, index=True)
     display_name: Mapped[str] = mapped_column(String(80))
     password_hash: Mapped[str] = mapped_column(String(255))
+    # JWTs are stateless, so there is nothing to revoke when a password
+    # changes. Comparing a token's `iat` against this is what makes "changing
+    # my password signs out my other devices" actually true.
+    password_changed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

@@ -22,13 +22,15 @@ React (Vercel)  ──HTTPS──▶  FastAPI (Render)  ──▶  Postgres (Neo
 
 | Phase | สถานะ |
 |---|---|
-| 0 — บัญชี/เครื่องมือ | 🔲 ผู้ใช้ทำเอง (Vercel / Render / Neon / Supabase) |
-| 1 — Schema + Backend | ✅ เสร็จ |
-| 1.5 — Deploy hello-world ทะลุทั้งสาย | 🔲 |
+| 0 — สมัคร Vercel / Render / Neon / Supabase | 🔲 ต้องทำเอง |
+| 1 — Schema + Backend | ✅ |
+| 3 — Frontend | ✅ |
+| 4 — PWA | ✅ |
+| 5 — Deploy | 🔲 config พร้อมแล้ว ทำตาม runbook ข้างล่าง |
 | 2 — OCR | ⏸️ พักไว้ ใช้ Google Vision ทีหลัง (seam ทำไว้แล้ว) |
-| 3 — Frontend | 🔲 |
-| 4 — PWA | 🔲 |
-| 5–8 | 🔲 |
+| 6 — ทดสอบก่อนใช้จริง | 🔲 |
+| 7 — ติดตั้งบนมือถือ | 🔲 |
+| 8 — เฝ้าระวังหลังใช้จริง | 🔲 |
 
 ---
 
@@ -48,6 +50,66 @@ React (Vercel)  ──HTTPS──▶  FastAPI (Render)  ──▶  Postgres (Neo
 
 ---
 
+## Deploy runbook
+
+ลำดับสำคัญ เพราะ Render ต้องรู้โดเมน Vercel และ Vercel ต้องรู้ URL ของ Render — ไก่กับไข่ ต้องเดินสองรอบ
+
+### 1. Neon
+สร้าง project → เลือก region **Singapore** → คัดลอก **pooled connection string** (`...-pooler...`) เก็บไว้
+
+### 2. Supabase (เก็บรูปสลิปอย่างเดียว ไม่ได้ใช้ DB ของมัน)
+สร้าง project → **Storage → New bucket** ชื่อ `slips` → **ปิด Public bucket ให้แน่ใจ**
+เอา **Project URL** กับ **service_role key** (Settings → API) เก็บไว้ — service_role ข้าม RLS ได้ ห้ามหลุดไปฝั่ง frontend เด็ดขาด
+
+### 3. เตรียมฐานข้อมูล (รันจากเครื่องตัวเอง ยิงตรงไป Neon)
+Render free ไม่มี shell เลยต้อง seed จากเครื่อง
+
+```bash
+cd backend
+python -m venv .venv && .venv/Scripts/activate
+pip install -r requirements.txt
+DATABASE_URL="<neon-connection-string>" \
+SEED_USERS="boriwat:บอ:รหัสของคุณ,fon:ฝน:รหัสของแฟน" \
+  python -m scripts.seed
+```
+
+สร้างตาราง + 2 users + 10 หมวดหมู่ + keyword ประมาณ 90 คำ รันซ้ำได้ไม่ทับของเดิม
+
+### 4. Render
+New → **Blueprint** → เลือก repo นี้ (มันอ่าน `render.yaml` เอง)
+ใส่ env var ที่ marked `sync: false`:
+
+| key | ค่า |
+|---|---|
+| `DATABASE_URL` | connection string จาก Neon |
+| `CORS_ORIGINS` | ใส่ `https://localhost` ไปพลางก่อน แล้วกลับมาแก้ในข้อ 6 |
+| `SUPABASE_URL` | Project URL |
+| `SUPABASE_SERVICE_KEY` | service_role key |
+
+`JWT_SECRET` Render สุ่มให้เอง
+Deploy เสร็จ เปิด `https://<ชื่อ>.onrender.com/health` ต้องได้ `"database":"ok"`
+
+### 5. Vercel
+Import repo → **Root Directory = `frontend`** (สำคัญ ไม่งั้น build ไม่เจอ)
+Environment Variable: `VITE_API_URL` = URL ของ Render (ไม่มี `/` ปิดท้าย)
+Deploy → จด production domain ไว้
+
+> `VITE_*` ถูก inline ตอน build ไม่ใช่ตอน run — แก้ค่าแล้วต้อง **Redeploy** ถึงจะมีผล
+
+### 6. กลับไป Render
+แก้ `CORS_ORIGINS` เป็นโดเมน Vercel จริง เช่น `https://bank-xxxx.vercel.app` → save (Render redeploy เอง)
+
+> preview deployment ของ Vercel ใช้โดเมนคนละอันทุกครั้ง จะติด CORS ถ้าไม่ได้ใส่ไว้ด้วย ใช้ production domain เป็นหลัก
+
+### 7. ทดสอบ
+เปิดโดเมน Vercel บนคอม → เปิด DevTools Console → login
+ถ้าเจอ CORS error แปลว่าข้อ 6 ยังไม่ตรง ถ้าค้างที่หน้าปลุกนานๆ แปลว่า Render กำลัง cold start (ปกติรอบแรก 30–60 วิ)
+
+### 8. ติดตั้งบนมือถือ
+Safari → เปิดโดเมน Vercel → Share → **Add to Home Screen** ทำทั้งสองเครื่อง
+
+---
+
 ## Backend
 
 ### รันในเครื่อง
@@ -59,13 +121,12 @@ python -m venv .venv
 pip install -r requirements.txt
 
 cp .env.example .env            # แล้วเติม DATABASE_URL จาก Neon + JWT_SECRET
-python -m scripts.seed          # สร้าง 2 users + หมวดหมู่ + keywords
+python -m scripts.seed
 
 uvicorn app.main:app --reload   # http://localhost:8000/docs
 ```
 
-`scripts/seed.py` รันซ้ำได้ ไม่ทับของเดิม ถ้าไม่ตั้ง `SEED_USERS` มันจะสุ่มรหัสผ่านให้แล้วพิมพ์ออกมาครั้งเดียว
-เปลี่ยนรหัสทีหลัง: `python -m scripts.seed --reset-password boriwat=รหัสใหม่`
+เปลี่ยนรหัสผ่านทีหลัง: `python -m scripts.seed --reset-password boriwat=รหัสใหม่`
 
 ### เทสต์
 
@@ -79,7 +140,7 @@ python -m tests.test_timeutil  # 25 checks — คณิตศาสตร์ ti
 | | |
 |---|---|
 | `GET /health` | ปลุก Render + warm Neon ในครั้งเดียว ตอบ 200 เสมอ บอกสถานะ db/storage ใน body |
-| `POST /auth/login` → `GET /auth/me` → `GET /auth/users` | JWT อายุ 30 วัน |
+| `POST /auth/login` · `GET /auth/me` · `GET /auth/users` | JWT อายุ 30 วัน |
 | `GET /categories` · `GET /categories/suggest?text=` | เดาหมวดหมู่จากตาราง keyword |
 | `GET/POST /transactions` · `GET/PUT/DELETE /transactions/{id}` | PUT ต้องส่ง `version` |
 | `GET /transactions/summary?month=YYYY-MM` | ยอดรวม + แยกตามหมวด/ตามคน |
@@ -97,10 +158,38 @@ Render กับ Neon เป็น UTC — รายการที่ลงต�
 
 ## Frontend
 
-ยังไม่ได้ทำ
+```bash
+cd frontend
+npm install
+cp .env.example .env.local      # ชี้ VITE_API_URL ไปที่ backend
+npm run dev                     # http://localhost:5173
+```
+
+หน้าจอ: หน้าปลุก backend → login → รายการ (กรองตามเดือน/คน/หมวด/ค้นหา) → เพิ่ม/แก้ → สรุป + export CSV
+
+โครงสร้าง:
+
+| ไฟล์ | หน้าที่ |
+|---|---|
+| `src/api/client.js` | fetch wrapper ตัวเดียว จัดการ token, 401, error shape |
+| `src/components/WakeScreen.jsx` | poll `/health` จน stack ตอบ แยก "Render ยังหลับ" กับ "Neon ยังตื่นไม่เต็มที่" |
+| `src/components/TransactionForm.jsx` | ใช้ร่วมกันทั้งหน้าเพิ่มและหน้าแก้ |
+| `src/utils/format.js` | เงิน/วันที่ ตรึงเป็น `Asia/Bangkok` ไม่อิง timezone ของเครื่อง |
 
 ---
 
+## ยังไม่ได้ทำ / ต้องระวัง
+
+- **ยังไม่ได้ยืนยัน datetime round-trip บน Postgres จริง** — SQLite แทน `TIMESTAMPTZ` ไม่ได้ (ทิ้ง offset เก็บเป็น local wall-clock text) เลข timezone เองเทสต์ครบใน `tests/test_timeutil.py` แล้ว แต่ตอนต่อ Neon ครั้งแรกให้ลงรายการตอนดึกๆ (เที่ยงคืน–ตี 7) หนึ่งรายการ แล้วเช็คว่าอยู่ถูกวันไหม
+- **ยังไม่ได้ทดสอบบนมือถือจริง** — cold start, กล้อง, Add to Home Screen
+- **OCR ยังไม่ต่อ** — `OCR_PROVIDER=none` ทุกอย่างกรอกมือ พอจะต่อ Google Vision แก้ที่ `GoogleVisionProvider.extract()` ที่เดียว ไม่ต้องแตะ schema หรือ frontend
+- **ลบรายการแล้วรูปสลิปถูกลบแบบ best-effort** — ถ้า storage ล่มตอนนั้น จะเหลือไฟล์กำพร้าค้างไว้ (ยอมได้ ดีกว่าลบรายการไม่สำเร็จ)
+- **แก้สลิปออกจากรายการเดิม ไม่ลบไฟล์ใน bucket**
+
 ## Backup
 
-`GET /transactions/export.csv` เป็นทางออกของข้อมูล ควร export เก็บเป็นระยะ ไม่ปล่อยให้ข้อมูลติดอยู่ใน Neon อย่างเดียว
+`GET /transactions/export.csv` หรือปุ่มในหน้าสรุป ควร export เก็บเป็นระยะ ไม่ปล่อยให้ข้อมูลติดอยู่ใน Neon อย่างเดียว
+
+## เรื่อง quota
+
+Render free 750 ชม./เดือน — service เดียวรัน 24/7 กินประมาณ 730 ชม. ถ้าอยากตัดปัญหา cold start ด้วยการตั้ง cron ping `/health` ทุก 10 นาที ทำได้ แต่จะกินโควตาเกือบหมด เหลือที่ให้ service ฟรีตัวที่สองไม่ได้อีก

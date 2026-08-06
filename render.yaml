@@ -1,0 +1,48 @@
+# Render blueprint. Import via Render > New > Blueprint, pointed at this repo.
+#
+# Native Python runtime on purpose, not Docker: nothing here needs an apt
+# package. That stays true only while OCR is off. Wiring Google Cloud Vision
+# later keeps it true (it is an HTTPS call); switching to local Tesseract
+# instead would not — `apt-get` cannot run in a Render build, which is
+# non-root, so that route means a Dockerfile and a much slower cold start.
+
+services:
+  - type: web
+    name: bank-api
+    runtime: python
+    plan: free
+    region: singapore # closest free region to Thailand
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    # /health answers 200 even when Neon is asleep, so a suspended database
+    # never turns into a Render crash-loop.
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.8"
+
+      # Neon pooled connection string. Set in the dashboard, never in git.
+      - key: DATABASE_URL
+        sync: false
+
+      - key: JWT_SECRET
+        generateValue: true
+
+      # The Vercel production domain, comma-separated if more than one.
+      # Preview deployments get their own hostnames and will fail CORS unless
+      # they are listed here too.
+      - key: CORS_ORIGINS
+        sync: false
+
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: SUPABASE_BUCKET
+        value: slips
+
+      - key: OCR_PROVIDER
+        value: none
+      - key: APP_TIMEZONE
+        value: Asia/Bangkok

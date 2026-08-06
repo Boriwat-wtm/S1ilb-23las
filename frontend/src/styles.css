@@ -1,37 +1,100 @@
-/* ---------------------------------------------------------------- tokens */
+/* ==========================================================================
+   Bank — design system
+
+   Thesis: a ledger that looks like a ledger. Ruled tables and tabular figures
+   carry the page, not cards. Colour marks the direction of money, not whether
+   it is good news. The boundary of the book — whose it is, who else can see
+   it — stays visible at all times.
+
+   Three rules the rest of this file follows:
+
+   1. Rules, not boxes. A 1px line separating two rows says the same thing as a
+      card with a shadow, at a tenth of the visual cost, and it is what an
+      account book actually looks like.
+
+   2. Colour is directional, never sentimental. In a debt ledger "money in" is
+      debt going up, so green-good / red-bad would be actively wrong. --credit
+      and --debit mean credit and debit, and every amount carries a + or − so
+      the meaning survives colour blindness and greyscale printing.
+
+   3. Thai has no uppercase. `text-transform: uppercase` is a no-op here, so
+      label hierarchy comes from size, weight, colour and letter-spacing.
+      Tracking is applied only where the text is Latin.
+   ========================================================================== */
+
 :root {
-  --teal: #0f766e;
-  --teal-bright: #14b8a6;
+  /* --- spacing scale --- */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 24px;
+  --s6: 32px;
+  --s7: 48px;
 
-  --bg: #f6f7f9;
+  /* --- geometry: mostly square. Ledgers do not have rounded corners. --- */
+  --r-control: 4px;
+  --r-surface: 8px;
+  --rail-w: 264px;
+  --tabbar-h: 58px;
+  --measure: 1120px;
+
+  /* --- light --- */
+  --paper: #f4f4f1;
   --surface: #ffffff;
-  --surface-2: #eef1f5;
-  --border: #dfe3ea;
-  --text: #131b26;
-  --text-dim: #5d6b7f;
-  --danger: #b91c1c;
-  --danger-bg: #fef2f2;
-  --warn: #92400e;
-  --warn-bg: #fffbeb;
+  --surface-sunk: #ececea;
+  --rule: #dcdcd7;
+  --rule-strong: #b9b9b2;
+  --ink: #16181c;
+  --ink-2: #55585f;
+  --ink-3: #83868d;
 
-  --radius: 14px;
-  --tabbar-h: 62px;
+  --accent: #0f766e;
+  --accent-ink: #ffffff;
+  --accent-soft: #dcefec;
+
+  /* Direction of money, not sentiment. See note 2 above. */
+  --credit: #0b6f57;
+  --debit: #a63d24;
+  --credit-soft: #e0f0ea;
+  --debit-soft: #f7e6e1;
+
+  --warn: #8a5a00;
+  --warn-soft: #fdf3dd;
+  --danger: #a3231b;
+  --danger-soft: #fbe9e7;
+
+  --focus: #0f766e;
 
   color-scheme: light dark;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0b1220;
-    --surface: #131c2b;
-    --surface-2: #1b2537;
-    --border: #26324a;
-    --text: #e8edf5;
-    --text-dim: #93a2b8;
-    --danger: #f87171;
-    --danger-bg: #2a1414;
-    --warn: #fbbf24;
-    --warn-bg: #2b2210;
+    --paper: #0d0f13;
+    --surface: #14171d;
+    --surface-sunk: #1b1f27;
+    --rule: #272c36;
+    --rule-strong: #3b424f;
+    --ink: #e9ecf1;
+    --ink-2: #a3aab7;
+    --ink-3: #757d8b;
+
+    --accent: #17a394;
+    --accent-ink: #04120f;
+    --accent-soft: #12332f;
+
+    --credit: #43cfa6;
+    --debit: #f08a6d;
+    --credit-soft: #102e26;
+    --debit-soft: #331a13;
+
+    --warn: #e5b25a;
+    --warn-soft: #2c2312;
+    --danger: #f0796d;
+    --danger-soft: #2f1614;
+
+    --focus: #2dd4bf;
   }
 }
 
@@ -46,15 +109,31 @@ body {
 }
 
 body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans Thai', 'Sarabun',
-    Roboto, sans-serif;
-  font-size: 16px;
-  line-height: 1.5;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans Thai",
+    "Leelawadee UI", Sarabun, Roboto, sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
-  /* stops the whole page rubber-banding under the fixed tab bar on iOS */
   overscroll-behavior-y: none;
+}
+
+/* Every figure in this app is money or a date. Tabular by default so columns
+   of numbers line up on the decimal without per-component opt-in. */
+.num,
+td.num,
+.amount,
+.masthead-figure,
+.stat-figure {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* Mono is reserved for genuinely technical strings: usernames, ids, refs. */
+.mono {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.82em;
 }
 
 h1,
@@ -62,6 +141,7 @@ h2,
 h3 {
   margin: 0;
   font-weight: 650;
+  line-height: 1.25;
 }
 
 a {
@@ -69,84 +149,187 @@ a {
   text-decoration: none;
 }
 
-/* --------------------------------------------------------------- shell */
-.app {
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* --------------------------------------------------------------- type roles */
+.t-display {
+  font-size: clamp(1.9rem, 7vw, 2.6rem);
+  font-weight: 680;
+  letter-spacing: -0.02em;
+}
+
+.t-heading {
+  font-size: 1.02rem;
+  font-weight: 650;
+}
+
+/* Section labels. No uppercase — see note 3. Hierarchy from size + colour. */
+.t-label {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--ink-3);
+}
+
+.t-label-latin {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.t-meta {
+  font-size: 0.78rem;
+  color: var(--ink-2);
+}
+
+.t-dim {
+  color: var(--ink-2);
+}
+
+.t-faint {
+  color: var(--ink-3);
+}
+
+/* ============================================================ app shell ==
+   Mobile: header + scrolling content + bottom tab bar.
+   >=900px: the tab bar is replaced by a persistent ledger rail, so which book
+   you are in is never more than a glance away. Recomposed, not squeezed.
+   ========================================================================= */
+.shell {
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
 }
 
+.shell-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.rail {
+  display: none;
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + var(--s4));
+}
+
+.wrap {
+  max-width: var(--measure);
+  margin: 0 auto;
+  padding: 0 var(--s4);
+}
+
+/* --------------------------------------------------------------- topbar */
 .topbar {
   position: sticky;
   top: 0;
-  z-index: 20;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: calc(env(safe-area-inset-top) + 10px) 16px 10px;
+  z-index: 30;
   background: var(--surface);
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--rule);
+  padding-top: env(safe-area-inset-top);
 }
 
-.topbar-brand {
+.topbar-inner {
+  max-width: var(--measure);
+  margin: 0 auto;
+  padding: var(--s2) var(--s4);
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-weight: 700;
+  gap: var(--s3);
+  min-height: 52px;
 }
 
-.topbar-logo {
+.mark {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 9px;
-  background: var(--teal);
-  color: #fff;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: var(--r-control);
+  background: var(--accent);
+  color: var(--accent-ink);
   font-weight: 700;
+  font-size: 0.95rem;
 }
 
-.topbar-right {
+.spacer {
+  flex: 1;
+}
+
+/* --- ledger identity chip: the "whose book is this" anchor --- */
+.ledger-chip {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--s2);
+  min-width: 0;
+  padding: var(--s1) var(--s2);
+  margin-left: calc(var(--s2) * -1);
+  border: 1px solid transparent;
+  border-radius: var(--r-control);
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
 }
 
-.topbar-user {
-  color: var(--text-dim);
-  font-size: 0.9rem;
+.ledger-chip:hover {
+  border-color: var(--rule);
+  background: var(--surface-sunk);
 }
 
-.content {
-  flex: 1;
-  padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 12px);
+.ledger-chip-name {
+  font-weight: 650;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.page {
-  max-width: 640px;
-  margin: 0 auto;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
+.ledger-chip-caret {
+  color: var(--ink-3);
+  font-size: 0.7rem;
+  flex: none;
 }
 
-.page-title {
-  font-size: 1.3rem;
+/* Privacy made visible: a lock or a headcount, never nothing. */
+.share-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: none;
+  font-size: 0.72rem;
+  color: var(--ink-2);
+  border: 1px solid var(--rule);
+  border-radius: 99px;
+  padding: 0 var(--s2);
+  line-height: 1.7;
+  white-space: nowrap;
+}
+
+.share-badge.is-shared {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+  background: var(--accent-soft);
 }
 
 /* --------------------------------------------------------------- tabbar */
 .tabbar {
   position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 30;
+  inset: auto 0 0 0;
+  z-index: 40;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   background: var(--surface);
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--rule);
   padding-bottom: env(safe-area-inset-bottom);
 }
 
@@ -157,155 +340,417 @@ a {
   justify-content: center;
   gap: 2px;
   height: var(--tabbar-h);
-  font-size: 0.72rem;
-  color: var(--text-dim);
+  font-size: 0.68rem;
+  color: var(--ink-2);
+  border-top: 2px solid transparent;
+  margin-top: -1px;
 }
 
-.tab span:first-child {
-  font-size: 1.15rem;
+.tab-glyph {
+  font-size: 1.05rem;
   line-height: 1;
 }
 
 .tab.active {
-  color: var(--teal-bright);
+  color: var(--accent);
+  border-top-color: var(--accent);
   font-weight: 600;
 }
 
-/* ----------------------------------------------------------- wake screen */
-.wake,
-.login {
-  min-height: 100dvh;
-  display: grid;
-  place-items: center;
-  padding: 24px;
-  background: var(--bg);
+/* ======================================================= desktop rail == */
+@media (min-width: 900px) {
+  .main {
+    padding-bottom: var(--s7);
+  }
+
+  .tabbar {
+    display: none;
+  }
+
+  .rail {
+    display: flex;
+    flex-direction: column;
+    width: var(--rail-w);
+    flex: none;
+    border-right: 1px solid var(--rule);
+    background: var(--surface);
+    position: sticky;
+    top: 53px;
+    height: calc(100dvh - 53px);
+    overflow-y: auto;
+  }
+
+  .topbar .ledger-chip {
+    display: none;
+  }
+
+  .wrap {
+    padding: 0 var(--s5);
+  }
 }
 
-.wake-card,
-.login-card {
-  width: 100%;
-  max-width: 340px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 14px;
-  text-align: center;
+.rail-section {
+  padding: var(--s4) var(--s4) var(--s2);
 }
 
-.wake-logo,
-.login-logo {
-  display: grid;
-  place-items: center;
-  width: 62px;
-  height: 62px;
-  border-radius: 20px;
-  background: linear-gradient(150deg, var(--teal-bright), var(--teal));
-  color: #fff;
-  font-size: 1.9rem;
-  font-weight: 700;
-  box-shadow: 0 10px 28px rgba(15, 118, 110, 0.35);
-}
-
-.wake-title {
-  font-size: 1.4rem;
-  letter-spacing: 0.02em;
-}
-
-.wake-bar {
-  width: 100%;
-  height: 6px;
-  border-radius: 99px;
-  background: var(--surface-2);
-  overflow: hidden;
-}
-
-.wake-bar-fill {
-  height: 100%;
-  border-radius: 99px;
-  background: linear-gradient(90deg, var(--teal), var(--teal-bright));
-  transition: width 0.45s cubic-bezier(0.22, 0.61, 0.36, 1);
-}
-
-.wake-message {
-  margin: 0;
-  min-height: 2.6em;
-  color: var(--text-dim);
-  font-size: 0.92rem;
-}
-
-.wake-slow {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  font-size: 0.85rem;
-  color: var(--text-dim);
-}
-
-.wake-slow p {
-  margin: 0;
-}
-
-/* --------------------------------------------------------------- login */
-.login-card {
-  gap: 12px;
-}
-
-.login-card h1 {
-  font-size: 1.25rem;
-  margin-bottom: 4px;
-}
-
-/* --------------------------------------------------------------- cards */
-.card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.card-head {
+.rail-head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--s2);
+  margin-bottom: var(--s2);
 }
 
-.card-head h2 {
-  font-size: 0.95rem;
+.rail-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 var(--s2) var(--s4);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
 }
 
-/* --------------------------------------------------------------- fields */
+/* Rendered as a <button> so it is keyboard-operable and announced correctly.
+   The reset lives here rather than inline, because an inline `border` shorthand
+   silently beats `.rail-item.active { border-left-color }` and the selected
+   book loses its marker. */
+.rail-item {
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  align-items: center;
+  gap: var(--s2);
+  width: 100%;
+  padding: var(--s2);
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  background: none;
+  border: 0;
+  border-left: 2px solid transparent;
+  border-radius: var(--r-control);
+}
+
+.rail-item:hover {
+  background: var(--surface-sunk);
+}
+
+.rail-item.active {
+  background: var(--accent-soft);
+  border-left-color: var(--accent);
+  font-weight: 600;
+}
+
+.rail-item-name {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.rail-item-title {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rail-nav {
+  border-top: 1px solid var(--rule);
+  padding: var(--s3) var(--s2);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: auto;
+}
+
+.rail-nav a {
+  padding: var(--s2) var(--s3);
+  border-radius: var(--r-control);
+  color: var(--ink-2);
+  font-size: 0.9rem;
+}
+
+.rail-nav a:hover {
+  background: var(--surface-sunk);
+  color: var(--ink);
+}
+
+.rail-nav a.active {
+  color: var(--ink);
+  font-weight: 600;
+  background: var(--surface-sunk);
+}
+
+/* ========================================================== page blocks */
+.page {
+  padding: var(--s4) 0 var(--s6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s5);
+}
+
+.page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--s3);
+  flex-wrap: wrap;
+}
+
+/* A rule under a small label is the section separator throughout. */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+}
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s3);
+  padding-bottom: var(--s2);
+  border-bottom: 1px solid var(--rule-strong);
+}
+
+/* ============================================== balance masthead ========
+   The one dominant element per viewport. Its label changes with the ledger
+   kind: a cashflow book reads the month's net, a debt book reads what is
+   still owed, which is the number that actually matters to the reader.
+   ======================================================================== */
+.masthead {
+  display: grid;
+  gap: var(--s3);
+  padding: var(--s5) 0 var(--s4);
+  border-bottom: 2px solid var(--ink);
+}
+
+.masthead-figure {
+  font-size: clamp(2rem, 9vw, 3rem);
+  font-weight: 680;
+  letter-spacing: -0.025em;
+  line-height: 1;
+}
+
+.masthead-split {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s5);
+  padding-top: var(--s1);
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.stat-figure {
+  font-size: 1.05rem;
+  font-weight: 650;
+}
+
+/* Debt books get a repayment rule: how much of the original is cleared. */
+.progress {
+  height: 4px;
+  background: var(--surface-sunk);
+  border: 1px solid var(--rule);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--credit);
+}
+
+/* ================================================== money ============== */
+.amount {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* The sign is not decoration — it is what carries the meaning when colour
+   is unavailable. Never remove it. */
+.amount.in {
+  color: var(--credit);
+}
+
+.amount.out {
+  color: var(--debit);
+}
+
+.amount.zero {
+  color: var(--ink-3);
+}
+
+/* =============================================== entry table =========== */
+.table-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-surface);
+  background: var(--surface);
+  -webkit-overflow-scrolling: touch;
+}
+
+table.ledger {
+  width: 100%;
+  min-width: 620px;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+table.ledger thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface-sunk);
+  border-bottom: 1px solid var(--rule-strong);
+  padding: var(--s2) var(--s3);
+  text-align: left;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+table.ledger th.right,
+table.ledger td.right {
+  text-align: right;
+}
+
+table.ledger tbody td {
+  border-bottom: 1px solid var(--rule);
+  padding: var(--s2) var(--s3);
+  vertical-align: baseline;
+}
+
+table.ledger tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+table.ledger tbody tr:hover td {
+  background: var(--surface-sunk);
+}
+
+/* A date repeated down twenty rows is noise; showing it once per day turns
+   the column into a set of day groups without adding a single element. */
+table.ledger td.date-cell {
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+table.ledger td.date-cell.repeat {
+  color: transparent;
+}
+
+table.ledger .desc-cell {
+  min-width: 180px;
+}
+
+table.ledger .running {
+  color: var(--ink-2);
+  border-left: 1px solid var(--rule);
+}
+
+.table-note {
+  font-size: 0.76rem;
+  color: var(--ink-3);
+  padding: var(--s2) var(--s3);
+  border-top: 1px solid var(--rule);
+  background: var(--surface-sunk);
+}
+
+/* ================================================ entry list =========== */
+.day-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.day-bar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s3);
+  padding: var(--s3) 0 var(--s1);
+  border-bottom: 1px solid var(--rule-strong);
+  font-size: 0.78rem;
+  color: var(--ink-2);
+}
+
+.entry-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.entry-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: baseline;
+  gap: var(--s3);
+  padding: var(--s3) var(--s1);
+  border-bottom: 1px solid var(--rule);
+}
+
+.entry-row:hover {
+  background: var(--surface);
+}
+
+.entry-glyph {
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+.entry-main {
+  min-width: 0;
+}
+
+.entry-desc {
+  font-weight: 550;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entry-meta {
+  font-size: 0.76rem;
+  color: var(--ink-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ================================================ controls ============= */
 .field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  width: 100%;
-  text-align: left;
+  gap: var(--s1);
+  min-width: 0;
 }
 
 .field > span {
-  font-size: 0.85rem;
-  color: var(--text-dim);
+  font-size: 0.8rem;
+  color: var(--ink-2);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--s2);
+  flex-wrap: wrap;
 }
 
 input,
 select,
 textarea {
   width: 100%;
-  /* 16px minimum — anything smaller makes iOS Safari zoom on focus */
   font: inherit;
+  /* 16px floor — below this, iOS Safari zooms the page on focus. */
   font-size: 16px;
-  color: var(--text);
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 11px 12px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-control);
+  padding: 9px 11px;
   appearance: none;
 }
 
@@ -313,372 +758,443 @@ textarea {
   resize: vertical;
 }
 
-input:focus,
-select:focus,
-textarea:focus {
-  outline: 2px solid var(--teal-bright);
-  outline-offset: 1px;
+input::placeholder,
+textarea::placeholder {
+  color: var(--ink-3);
 }
 
 .input-amount {
-  font-size: 1.4rem;
+  font-size: 1.6rem;
   font-weight: 650;
-  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+  padding: var(--s2) var(--s3);
 }
 
-.suggest-tag {
-  font-style: normal;
-  font-size: 0.72rem;
-  color: var(--teal-bright);
-  background: color-mix(in srgb, var(--teal-bright) 14%, transparent);
-  border-radius: 99px;
-  padding: 1px 8px;
-}
-
-/* -------------------------------------------------------------- buttons */
 .btn {
   font: inherit;
-  font-size: 0.95rem;
+  font-size: 0.92rem;
   font-weight: 600;
-  color: var(--text);
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 11px;
-  padding: 11px 16px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-control);
+  padding: 9px 14px;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+  white-space: nowrap;
 }
 
-.btn:active {
-  transform: translateY(1px);
+.btn:hover {
+  background: var(--surface-sunk);
 }
 
 .btn:disabled {
-  opacity: 0.55;
+  opacity: 0.5;
   cursor: default;
 }
 
 .btn-primary {
-  background: var(--teal);
-  border-color: var(--teal);
-  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.btn-primary:hover {
+  filter: brightness(1.08);
+  background: var(--accent);
 }
 
 .btn-danger {
-  background: transparent;
   color: var(--danger);
   border-color: color-mix(in srgb, var(--danger) 40%, transparent);
 }
 
-.btn-ghost {
-  background: transparent;
+.btn-quiet {
+  border-color: transparent;
+  background: none;
+  color: var(--ink-2);
+}
+
+.btn-quiet:hover {
+  background: var(--surface-sunk);
+  color: var(--ink);
 }
 
 .btn-sm {
-  font-size: 0.82rem;
-  padding: 7px 11px;
-  border-radius: 9px;
+  font-size: 0.8rem;
+  padding: 5px 10px;
 }
 
 .btn-block {
   width: 100%;
 }
 
-/* ------------------------------------------------------------- messages */
-.error-box,
-.banner {
-  margin: 0;
-  border-radius: 11px;
-  padding: 11px 13px;
+/* Segmented control: view switch, direction switch. One shared component so
+   "pick one of two or three" always looks the same. */
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-control);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.segmented button {
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink-2);
+  background: none;
+  border: 0;
+  border-right: 1px solid var(--rule);
+  padding: 7px 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.segmented button:last-child {
+  border-right: 0;
+}
+
+.segmented button[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.segmented.dir button[aria-pressed="true"][data-dir="in"] {
+  background: var(--credit);
+  color: #fff;
+}
+
+.segmented.dir button[aria-pressed="true"][data-dir="out"] {
+  background: var(--debit);
+  color: #fff;
+}
+
+.segmented button:focus-visible {
+  outline-offset: -2px;
+}
+
+/* ================================================ filters ============== */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2);
+}
+
+.toolbar > .grow {
+  flex: 1;
+  min-width: 160px;
+}
+
+.toolbar select,
+.toolbar input {
   font-size: 0.88rem;
+  padding: 7px 10px;
+  width: auto;
 }
 
-.error-box {
-  background: var(--danger-bg);
-  color: var(--danger);
-  border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent);
+.toolbar input[type="search"] {
+  width: 100%;
 }
 
-.banner-warn {
-  background: var(--warn-bg);
-  color: var(--warn);
-  border: 1px solid color-mix(in srgb, var(--warn) 30%, transparent);
+/* ================================================ misc surfaces ======== */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-surface);
+  padding: var(--s4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+}
+
+.notice {
+  border: 1px solid var(--rule-strong);
+  border-left-width: 3px;
+  border-radius: var(--r-control);
+  padding: var(--s3);
+  font-size: 0.87rem;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 8px;
+  gap: var(--s2);
 }
 
-.banner p {
+.notice p {
   margin: 0;
 }
 
-.hint {
-  margin: 0;
-  font-size: 0.82rem;
-  color: var(--text-dim);
+.notice-warn {
+  border-left-color: var(--warn);
+  background: var(--warn-soft);
+  color: var(--warn);
 }
 
-.muted {
-  color: var(--text-dim);
+.notice-error {
+  border-left-color: var(--danger);
+  background: var(--danger-soft);
+  color: var(--danger);
 }
 
-.muted-sm {
-  color: var(--text-dim);
-  font-size: 0.8rem;
-}
-
-.center {
-  text-align: center;
+.notice-info {
+  border-left-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--ink);
 }
 
 .empty {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
-  padding: 36px 16px;
-  color: var(--text-dim);
+  gap: var(--s3);
+  padding: var(--s7) var(--s4);
+  border: 1px dashed var(--rule-strong);
+  border-radius: var(--r-surface);
+  color: var(--ink-2);
   text-align: center;
 }
 
-/* ----------------------------------------------------------------- slip */
+.rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--rule);
+}
+
+.rows > li {
+  border-bottom: 1px solid var(--rule);
+  padding: var(--s3) 0;
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  flex-wrap: wrap;
+}
+
+.rows .grow {
+  flex: 1;
+  min-width: 0;
+}
+
+.bar-row {
+  display: grid;
+  gap: 3px;
+  padding: var(--s2) 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.bar-line {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s3);
+  font-size: 0.88rem;
+}
+
+.bar-track {
+  height: 3px;
+  background: var(--surface-sunk);
+}
+
+.bar-fill {
+  height: 100%;
+  background: var(--debit);
+}
+
+.bar-fill.in {
+  background: var(--credit);
+}
+
+/* ================================================ sheet (mobile) ======= */
+.sheet-list {
+  padding: 0;
+}
+
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: flex-end;
+}
+
+.sheet {
+  width: 100%;
+  max-height: 82dvh;
+  overflow-y: auto;
+  background: var(--surface);
+  border-top-left-radius: var(--r-surface);
+  border-top-right-radius: var(--r-surface);
+  border-top: 1px solid var(--rule-strong);
+  padding: var(--s4) var(--s4) calc(var(--s4) + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+}
+
+@media (min-width: 640px) {
+  .sheet-backdrop {
+    align-items: center;
+    justify-content: center;
+    padding: var(--s4);
+  }
+
+  .sheet {
+    max-width: 440px;
+    border-radius: var(--r-surface);
+    border: 1px solid var(--rule-strong);
+  }
+}
+
+/* ================================================ slip ================= */
 .slip-drop {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  min-height: 128px;
-  border: 2px dashed var(--border);
-  border-radius: 12px;
-  color: var(--text-dim);
-  font-size: 0.9rem;
+  gap: var(--s2);
+  min-height: 108px;
+  border: 1px dashed var(--rule-strong);
+  border-radius: var(--r-control);
+  color: var(--ink-2);
+  font-size: 0.88rem;
   cursor: pointer;
-}
-
-.slip-drop-icon {
-  font-size: 1.8rem;
+  background: var(--surface-sunk);
 }
 
 .slip-preview {
   position: relative;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 10px;
+  align-items: flex-start;
+  gap: var(--s2);
 }
 
 .slip-preview img {
   max-width: 100%;
-  max-height: 320px;
-  border-radius: 11px;
-  border: 1px solid var(--border);
+  max-height: 300px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-control);
 }
 
-.slip-uploading {
+.slip-busy {
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
-  background: rgba(0, 0, 0, 0.45);
+  background: rgba(0, 0, 0, 0.5);
   color: #fff;
-  border-radius: 11px;
+  border-radius: var(--r-control);
   font-size: 0.85rem;
 }
 
-/* ------------------------------------------------------------- tx form */
-.tx-form {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.form-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-/* -------------------------------------------------------------- filters */
-.month-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.month-select {
-  flex: 1;
-  font-weight: 600;
-}
-
-.month-total {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  line-height: 1.2;
-}
-
-.month-total strong {
-  font-size: 1.15rem;
-}
-
-.filters {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.filter-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.filter-row select {
-  flex: 1;
-  font-size: 0.9rem;
-  padding: 9px 10px;
-}
-
-/* ----------------------------------------------------------- tx listing */
-.day-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.day-head {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.82rem;
-  color: var(--text-dim);
-  padding: 0 4px;
-}
-
-.tx-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  overflow: hidden;
-}
-
-.tx-list li + li .tx-item {
-  border-top: 1px solid var(--border);
-}
-
-.tx-item {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  padding: 11px 13px;
-}
-
-.tx-item:active {
-  background: var(--surface-2);
-}
-
-.tx-emoji {
-  font-size: 1.2rem;
-  width: 26px;
-  text-align: center;
-  flex: none;
-}
-
-.tx-main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.tx-desc {
-  font-weight: 550;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.tx-meta {
-  font-size: 0.76rem;
-  color: var(--text-dim);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.tx-amount {
-  font-weight: 650;
-  font-variant-numeric: tabular-nums;
-  flex: none;
-}
-
-/* -------------------------------------------------------------- summary */
-.total-card {
-  align-items: center;
-  gap: 4px;
-  text-align: center;
-}
-
-.total-big {
-  font-size: 2rem;
-  font-variant-numeric: tabular-nums;
-}
-
-.split-list,
-.cat-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.split-list li {
+/* ================================================ auth / wake ========== */
+.centered {
+  min-height: 100dvh;
   display: grid;
-  grid-template-columns: 1fr auto auto;
-  gap: 10px;
-  align-items: baseline;
+  place-items: center;
+  padding: var(--s5);
 }
 
-.split-list strong {
-  font-variant-numeric: tabular-nums;
-}
-
-.cat-line {
+.auth-card {
+  width: 100%;
+  max-width: 340px;
   display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  font-size: 0.9rem;
-  margin-bottom: 4px;
+  flex-direction: column;
+  gap: var(--s3);
 }
 
-.cat-name {
+.auth-mark {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-surface);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.wake-bar {
+  height: 3px;
+  background: var(--surface-sunk);
+  border: 1px solid var(--rule);
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.cat-line strong {
-  font-variant-numeric: tabular-nums;
-  flex: none;
-}
-
-.cat-bar {
-  height: 6px;
-  border-radius: 99px;
-  background: var(--surface-2);
-  overflow: hidden;
-}
-
-.cat-bar-fill {
+.wake-bar-fill {
   height: 100%;
-  border-radius: 99px;
-  background: linear-gradient(90deg, var(--teal), var(--teal-bright));
+  background: var(--accent);
+  transition: width 0.45s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.wake-msg {
+  min-height: 2.6em;
+  font-size: 0.88rem;
+  color: var(--ink-2);
+  margin: 0;
+}
+
+/* --------------------------------------------------------------- misc */
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  flex-wrap: wrap;
+}
+
+.spread {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+}
+
+.grid-2 {
+  display: grid;
+  gap: var(--s3);
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 720px) {
+  .grid-2 {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.role-tag {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--ink-2);
+  border: 1px solid var(--rule-strong);
+  border-radius: 2px;
+  padding: 0 5px;
+  line-height: 1.6;
+}
+
+.role-tag.owner {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {

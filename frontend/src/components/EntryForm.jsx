@@ -2,18 +2,22 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { apiSlipUrl, apiSuggestCategory, apiUploadSlip } from '../api/client'
-import { useRefData } from '../data/RefDataContext'
+import { useLedgers } from '../data/LedgerContext'
 import { nowLocalInputValue, toLocalInputValue } from '../utils/format'
 
-const AMOUNT_RE = /^-?\d{0,9}(\.\d{0,2})?$/
+const AMOUNT_RE = /^\d{0,9}(\.\d{0,2})?$/
 
 /**
  * The form is the source of truth, always. Slip upload and category guessing
- * only ever prefill it — every field stays editable, and nothing here blocks
- * on either of them succeeding.
+ * only ever prefill it; every field stays editable and nothing blocks on
+ * either succeeding.
+ *
+ * The in/out control leads, not the amount, because in a debt ledger picking
+ * the wrong direction turns a repayment into new debt — a much worse mistake
+ * than a mistyped figure, and one the user cannot spot from the total alone.
  */
-export default function TransactionForm({
-  mode = 'add',
+export default function EntryForm({
+  mode = 'create',
   initial = null,
   onSubmit,
   onDelete,
@@ -21,8 +25,9 @@ export default function TransactionForm({
   error = null,
   conflict = null,
 }) {
-  const { categories } = useRefData()
+  const { currentId, categories, words } = useLedgers()
 
+  const [direction, setDirection] = useState(initial?.direction ?? 'out')
   const [occurredAt, setOccurredAt] = useState(
     initial ? toLocalInputValue(initial.occurred_at) : nowLocalInputValue(),
   )
@@ -34,7 +39,7 @@ export default function TransactionForm({
   const [note, setNote] = useState(initial?.note ?? '')
   const [formError, setFormError] = useState(null)
 
-  // Once the user picks a category themselves, stop second-guessing them.
+  // Once the user picks a category, stop second-guessing them.
   const [categoryTouched, setCategoryTouched] = useState(Boolean(initial?.category))
   const [suggestedBy, setSuggestedBy] = useState(null)
 
@@ -52,21 +57,21 @@ export default function TransactionForm({
   const fileInputRef = useRef(null)
   const objectUrlRef = useRef(null)
 
-  // --- existing slip: fetch a fresh signed URL to preview -----------------
+  // --- existing slip: mint a fresh signed URL to preview -------------------
   useEffect(() => {
-    if (mode !== 'edit' || !initial?.slip_path || !initial?.id) return
+    if (mode !== 'edit' || !initial?.slip_path || !initial?.id || !currentId) return undefined
     let cancelled = false
-    apiSlipUrl(initial.id)
+    apiSlipUrl(currentId, initial.id)
       .then((r) => {
         if (!cancelled) setSlip((s) => ({ ...s, url: r.signed_url }))
       })
       .catch(() => {
-        if (!cancelled) setSlipMessage('โหลดรูปสลิปไม่ได้ (ข้อมูลรายการยังแก้ได้ตามปกติ)')
+        if (!cancelled) setSlipMessage('โหลดรูปสลิปไม่ได้ (แก้ข้อมูลรายการได้ตามปกติ)')
       })
     return () => {
       cancelled = true
     }
-  }, [mode, initial?.id, initial?.slip_path])
+  }, [mode, initial?.id, initial?.slip_path, currentId])
 
   useEffect(
     () => () => {
@@ -75,9 +80,9 @@ export default function TransactionForm({
     [],
   )
 
-  // --- category auto-suggest ----------------------------------------------
+  // --- category auto-suggest ------------------------------------------------
   useEffect(() => {
-    if (categoryTouched) return
+    if (categoryTouched || !currentId) return undefined
     const text = description.trim()
     if (!text) {
       setSuggestedBy(null)
@@ -86,7 +91,7 @@ export default function TransactionForm({
     const controller = new AbortController()
     const timer = setTimeout(async () => {
       try {
-        const res = await apiSuggestCategory(text, controller.signal)
+        const res = await apiSuggestCategory(currentId, text, controller.signal)
         if (res?.category) {
           setCategoryId(String(res.category.id))
           setSuggestedBy(res.matched_keyword)
@@ -101,9 +106,9 @@ export default function TransactionForm({
       clearTimeout(timer)
       controller.abort()
     }
-  }, [description, categoryTouched])
+  }, [description, categoryTouched, currentId])
 
-  // --- slip upload ---------------------------------------------------------
+  // --- slip upload ----------------------------------------------------------
   const handleFile = async (event) => {
     const file = event.target.files?.[0]
     if (!file) return
@@ -116,7 +121,7 @@ export default function TransactionForm({
     setDuplicateId(null)
 
     try {
-      const res = await apiUploadSlip(file)
+      const res = await apiUploadSlip(currentId, file)
       setSlip({
         path: res.slip_path,
         url: res.signed_url || objectUrlRef.current,
@@ -155,30 +160,30 @@ export default function TransactionForm({
   }
 
   const onAmountChange = (e) => {
-    const v = e.target.value.replace(/[^\d.\-]/g, '')
+    const v = e.target.value.replace(/[^\d.]/g, '')
     if (v === '' || AMOUNT_RE.test(v)) setAmount(v)
   }
 
-  // --- submit --------------------------------------------------------------
   const submit = (e) => {
     e.preventDefault()
     setFormError(null)
 
     if (!description.trim()) return setFormError('กรอกชื่อรายการด้วย')
     if (!amount || Number.isNaN(Number(amount))) return setFormError('กรอกจำนวนเงินให้ถูกต้อง')
-    if (Number(amount) === 0) return setFormError('จำนวนเงินต้องไม่เป็น 0')
+    if (Number(amount) <= 0) return setFormError('จำนวนเงินต้องมากกว่า 0')
     if (!occurredAt) return setFormError('เลือกวันที่และเวลาด้วย')
 
     const payload = {
       occurred_at: occurredAt, // naive — the backend reads this as Bangkok time
       description: description.trim(),
       amount,
+      direction,
       category_id: categoryId ? Number(categoryId) : null,
       note: note.trim() || null,
       slip_path: slip.path,
     }
 
-    if (mode === 'add') {
+    if (mode === 'create') {
       payload.slip_ref = slip.ref
       payload.source = slip.source
       payload.ocr_raw_text = slip.rawText
@@ -193,10 +198,10 @@ export default function TransactionForm({
   const shownError = formError || error
 
   return (
-    <form className="tx-form" onSubmit={submit}>
+    <form className="stack" onSubmit={submit}>
       {conflict && (
-        <div className="banner banner-warn" role="alert">
-          <strong>อีกฝ่ายเพิ่งแก้รายการนี้</strong>
+        <div className="notice notice-warn" role="alert">
+          <strong>มีคนเพิ่งแก้รายการนี้</strong>
           <p>{conflict.message}</p>
           <button type="button" className="btn btn-sm" onClick={conflict.onReload}>
             โหลดข้อมูลล่าสุด
@@ -204,75 +209,58 @@ export default function TransactionForm({
         </div>
       )}
 
-      {/* --- slip ---------------------------------------------------------- */}
-      <section className="card">
-        <div className="card-head">
-          <h2>สลิป</h2>
-          <span className="muted-sm">ไม่บังคับ</span>
+      {/* Direction first: in a debt ledger this is the field that changes the
+          meaning of everything below it. */}
+      <fieldset className="field" style={{ border: 0, padding: 0, margin: 0 }}>
+        <legend className="t-label" style={{ padding: 0, marginBottom: 6 }}>
+          ประเภท
+        </legend>
+        <div className="segmented dir" role="group">
+          <button
+            type="button"
+            data-dir="out"
+            aria-pressed={direction === 'out'}
+            onClick={() => setDirection('out')}
+          >
+            − {words.out}
+          </button>
+          <button
+            type="button"
+            data-dir="in"
+            aria-pressed={direction === 'in'}
+            onClick={() => setDirection('in')}
+          >
+            + {words.in}
+          </button>
         </div>
+      </fieldset>
 
-        {slip.url ? (
-          <div className="slip-preview">
-            <img src={slip.url} alt="สลิปที่แนบไว้" />
-            {uploading && <div className="slip-uploading">กำลังอัปโหลด...</div>}
-            <button type="button" className="btn btn-ghost btn-sm" onClick={clearSlip}>
-              เอาสลิปออก
-            </button>
-          </div>
-        ) : (
-          <label className="slip-drop">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              onChange={handleFile}
-              hidden
-            />
-            <span className="slip-drop-icon" aria-hidden="true">📸</span>
-            <span>{uploading ? 'กำลังอัปโหลด...' : 'ถ่ายรูป / เลือกสลิป'}</span>
-          </label>
-        )}
+      <label className="field">
+        <span>จำนวนเงิน (บาท)</span>
+        <input
+          type="text"
+          inputMode="decimal"
+          value={amount}
+          onChange={onAmountChange}
+          placeholder="0.00"
+          className="input-amount"
+          required
+        />
+      </label>
 
-        {slipMessage && <p className="hint">{slipMessage}</p>}
+      <label className="field">
+        <span>รายการ</span>
+        <input
+          type="text"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="เช่น กาแฟเซเว่น"
+          maxLength={255}
+          required
+        />
+      </label>
 
-        {duplicateId && (
-          <div className="banner banner-warn">
-            <strong>สลิปใบนี้เคยลงไว้แล้ว</strong>
-            <Link className="btn btn-sm" to={`/edit/${duplicateId}`}>
-              ดูรายการเดิม
-            </Link>
-          </div>
-        )}
-      </section>
-
-      {/* --- fields -------------------------------------------------------- */}
-      <section className="card">
-        <label className="field">
-          <span>รายการ</span>
-          <input
-            type="text"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="เช่น กาแฟเซเว่น"
-            maxLength={255}
-            required
-          />
-        </label>
-
-        <label className="field">
-          <span>จำนวนเงิน (บาท)</span>
-          <input
-            type="text"
-            inputMode="decimal"
-            value={amount}
-            onChange={onAmountChange}
-            placeholder="0.00"
-            className="input-amount"
-            required
-          />
-        </label>
-
+      <div className="grid-2">
         <label className="field">
           <span>วันที่และเวลา</span>
           <input
@@ -287,7 +275,9 @@ export default function TransactionForm({
           <span>
             หมวดหมู่
             {suggestedBy && !categoryTouched && (
-              <em className="suggest-tag">เดาจาก “{suggestedBy}”</em>
+              <em className="t-faint" style={{ fontStyle: 'normal', fontSize: '0.72rem' }}>
+                เดาจาก “{suggestedBy}”
+              </em>
             )}
           </span>
           <select
@@ -307,21 +297,71 @@ export default function TransactionForm({
             ))}
           </select>
         </label>
+      </div>
 
-        <label className="field">
-          <span>หมายเหตุ</span>
-          <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} />
-        </label>
+      <label className="field">
+        <span>หมายเหตุ</span>
+        <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} />
+      </label>
+
+      <section className="section">
+        <div className="section-head">
+          <h2 className="t-label">สลิป</h2>
+          <span className="t-faint" style={{ fontSize: '0.74rem' }}>ไม่บังคับ</span>
+        </div>
+
+        {slip.url ? (
+          <div className="slip-preview">
+            <img src={slip.url} alt="สลิปที่แนบไว้" />
+            {uploading && <div className="slip-busy">กำลังอัปโหลด...</div>}
+            <button type="button" className="btn btn-quiet btn-sm" onClick={clearSlip}>
+              เอาสลิปออก
+            </button>
+          </div>
+        ) : (
+          <label className="slip-drop">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={handleFile}
+              hidden
+            />
+            <span aria-hidden="true" style={{ fontSize: '1.5rem' }}>📸</span>
+            <span>{uploading ? 'กำลังอัปโหลด...' : 'ถ่ายรูป / เลือกสลิป'}</span>
+          </label>
+        )}
+
+        {slipMessage && <p className="t-meta" style={{ margin: 0 }}>{slipMessage}</p>}
+
+        {duplicateId && (
+          <div className="notice notice-warn">
+            <strong>สลิปใบนี้เคยลงในสมุดนี้แล้ว</strong>
+            <Link className="btn btn-sm" to={`/entry/${duplicateId}`}>
+              ดูรายการเดิม
+            </Link>
+          </div>
+        )}
       </section>
 
-      {shownError && <p className="error-box" role="alert">{shownError}</p>}
+      {shownError && (
+        <p className="notice notice-error" role="alert">
+          {shownError}
+        </p>
+      )}
 
-      <div className="form-actions">
+      <div className="stack">
         <button type="submit" className="btn btn-primary btn-block" disabled={busy || uploading}>
-          {busy ? 'กำลังบันทึก...' : mode === 'add' ? 'บันทึก' : 'บันทึกการแก้ไข'}
+          {busy ? 'กำลังบันทึก...' : mode === 'create' ? 'บันทึก' : 'บันทึกการแก้ไข'}
         </button>
         {onDelete && (
-          <button type="button" className="btn btn-danger btn-block" onClick={onDelete} disabled={busy}>
+          <button
+            type="button"
+            className="btn btn-danger btn-block"
+            onClick={onDelete}
+            disabled={busy}
+          >
             ลบรายการนี้
           </button>
         )}

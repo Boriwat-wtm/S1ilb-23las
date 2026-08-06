@@ -1,6 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+
 import {
   apiLogin,
+  apiRegister,
   clearSession,
   getStoredUser,
   getToken,
@@ -19,20 +21,33 @@ export function AuthProvider({ children }) {
   }, [])
 
   // Any 401 anywhere — expired token, or iOS evicting a standalone PWA's
-  // localStorage — drops straight back to the login screen.
+  // localStorage — drops straight back to the sign-in screen.
   useEffect(() => {
     setUnauthorizedHandler(() => setUser(null))
     return () => setUnauthorizedHandler(() => {})
   }, [])
 
-  const login = useCallback(async (username, password) => {
-    const res = await apiLogin(username, password)
+  const adopt = useCallback((res) => {
     storeSession(res.access_token, res.user)
     setUser(res.user)
     return res.user
   }, [])
 
-  const value = useMemo(() => ({ user, login, logout }), [user, login, logout])
+  const login = useCallback(
+    async (username, password) => adopt(await apiLogin(username.trim().toLowerCase(), password)),
+    [adopt],
+  )
+
+  const register = useCallback(
+    async (username, displayName, password) =>
+      adopt(await apiRegister(username.trim().toLowerCase(), displayName.trim(), password)),
+    [adopt],
+  )
+
+  const value = useMemo(
+    () => ({ user, login, register, logout }),
+    [user, login, register, logout],
+  )
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 

@@ -1,37 +1,43 @@
 import { useCallback, useState } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 
-import Layout from './components/Layout'
+import AppShell from './components/AppShell'
 import WakeScreen from './components/WakeScreen'
 import { useAuth } from './auth/AuthContext'
-import { RefDataProvider } from './data/RefDataContext'
-import AddTransaction from './pages/AddTransaction'
-import Dashboard from './pages/Dashboard'
-import EditTransaction from './pages/EditTransaction'
+import { LedgerProvider } from './data/LedgerContext'
+import Entries from './pages/Entries'
+import EntryEdit from './pages/EntryEdit'
+import EntryNew from './pages/EntryNew'
+import LedgerNew from './pages/LedgerNew'
+import LedgerSettings from './pages/LedgerSettings'
 import Login from './pages/Login'
-import Summary from './pages/Summary'
+import MembersPage from './pages/MembersPage'
+import SummaryPage from './pages/SummaryPage'
 
 export default function App() {
   const { user } = useAuth()
   const [awake, setAwake] = useState(false)
   const handleReady = useCallback(() => setAwake(true), [])
 
-  // Nothing renders until the backend answers — every screen behind this needs
-  // it, so failing here once beats failing on every page individually.
+  // Nothing renders until the backend answers. Every screen behind this needs
+  // it, so failing here once beats failing on each page separately.
   if (!awake) return <WakeScreen onReady={handleReady} />
   if (!user) return <Login />
 
   return (
-    <RefDataProvider>
+    <LedgerProvider>
       <Routes>
-        <Route element={<Layout />}>
-          <Route index element={<Dashboard />} />
-          <Route path="add" element={<AddTransaction />} />
-          <Route path="edit/:id" element={<EditTransaction />} />
-          <Route path="summary" element={<Summary />} />
+        <Route element={<AppShell />}>
+          <Route index element={<Entries />} />
+          <Route path="new" element={<EntryNew />} />
+          <Route path="entry/:id" element={<EntryEdit />} />
+          <Route path="summary" element={<SummaryPage />} />
+          <Route path="members" element={<MembersPage />} />
+          <Route path="settings" element={<LedgerSettings />} />
+          <Route path="ledgers/new" element={<LedgerNew />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </RefDataProvider>
+    </LedgerProvider>
   )
 }

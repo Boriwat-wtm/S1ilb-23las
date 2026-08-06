@@ -1,31 +1,62 @@
 import { useState } from 'react'
+
 import { useAuth } from '../auth/AuthContext'
 
 export default function Login() {
-  const { login } = useAuth()
+  const { login, register } = useAuth()
+  const [mode, setMode] = useState('login')
   const [username, setUsername] = useState('')
+  const [displayName, setDisplayName] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
+
+  const isRegister = mode === 'register'
 
   const submit = async (e) => {
     e.preventDefault()
     setError(null)
     setBusy(true)
     try {
-      await login(username.trim(), password)
+      if (isRegister) await register(username, displayName, password)
+      else await login(username, password)
     } catch (err) {
-      setError(err.message || 'เข้าสู่ระบบไม่สำเร็จ')
+      setError(err.message || 'ไม่สำเร็จ')
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <div className="login">
-      <form className="login-card" onSubmit={submit}>
-        <div className="login-logo" aria-hidden="true">฿</div>
-        <h1>เข้าสู่ระบบ</h1>
+    <main className="centered">
+      <form className="auth-card" onSubmit={submit}>
+        <div className="auth-mark" aria-hidden="true">฿</div>
+        <h1 className="t-display" style={{ fontSize: '1.5rem' }}>
+          {isRegister ? 'สมัครใช้งาน' : 'เข้าสู่ระบบ'}
+        </h1>
+
+        <div className="segmented" role="group" aria-label="เลือกเข้าสู่ระบบหรือสมัคร">
+          <button
+            type="button"
+            aria-pressed={!isRegister}
+            onClick={() => {
+              setMode('login')
+              setError(null)
+            }}
+          >
+            เข้าสู่ระบบ
+          </button>
+          <button
+            type="button"
+            aria-pressed={isRegister}
+            onClick={() => {
+              setMode('register')
+              setError(null)
+            }}
+          >
+            สมัครใหม่
+          </button>
+        </div>
 
         <label className="field">
           <span>ชื่อผู้ใช้</span>
@@ -39,7 +70,25 @@ export default function Login() {
             spellCheck="false"
             required
           />
+          {isRegister && (
+            <span className="t-faint" style={{ fontSize: '0.74rem' }}>
+              3–32 ตัว ใช้ a–z 0–9 . _ - เพื่อนจะเชิญคุณเข้าสมุดด้วยชื่อนี้
+            </span>
+          )}
         </label>
+
+        {isRegister && (
+          <label className="field">
+            <span>ชื่อที่แสดง</span>
+            <input
+              type="text"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              autoComplete="name"
+              required
+            />
+          </label>
+        )}
 
         <label className="field">
           <span>รหัสผ่าน</span>
@@ -47,17 +96,26 @@ export default function Login() {
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            autoComplete="current-password"
+            autoComplete={isRegister ? 'new-password' : 'current-password'}
             required
           />
+          {isRegister && (
+            <span className="t-faint" style={{ fontSize: '0.74rem' }}>
+              อย่างน้อย 8 ตัว
+            </span>
+          )}
         </label>
 
-        {error && <p className="error-box" role="alert">{error}</p>}
+        {error && (
+          <p className="notice notice-error" role="alert">
+            {error}
+          </p>
+        )}
 
         <button type="submit" className="btn btn-primary btn-block" disabled={busy}>
-          {busy ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
+          {busy ? 'กำลังดำเนินการ...' : isRegister ? 'สมัครและเข้าใช้' : 'เข้าสู่ระบบ'}
         </button>
       </form>
-    </div>
+    </main>
   )
 }

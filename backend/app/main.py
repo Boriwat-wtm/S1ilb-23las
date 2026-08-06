@@ -7,7 +7,7 @@ from sqlalchemy import text
 
 from .config import settings
 from .database import Base, engine
-from .routers import auth, categories, slips, transactions
+from .routers import auth, categories, entries, ledgers, slips
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("bank")
@@ -27,8 +27,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Bank — บัญชีรายจ่ายสองคน",
-    version="0.1.0",
+    title="Bank — สมุดบัญชีส่วนตัว แชร์ได้",
+    version="0.2.0",
     lifespan=lifespan,
 )
 
@@ -41,8 +41,9 @@ app.add_middleware(
 )
 
 app.include_router(auth.router)
+app.include_router(ledgers.router)
 app.include_router(categories.router)
-app.include_router(transactions.router)
+app.include_router(entries.router)
 app.include_router(slips.router)
 
 

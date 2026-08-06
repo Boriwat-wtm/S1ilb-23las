@@ -1,19 +1,16 @@
-"""Seed the database: two fixed accounts + the starter category keyword map.
+"""Create tables, and optionally a demo account to poke at.
 
-Safe to re-run. Existing users are never touched (except via --reset-password)
-and existing categories/keywords are matched by name and left alone.
+Signup is public now, so seeding users is a development convenience rather than
+a deployment step. Against Neon the only thing this is really needed for is
+`--tables-only`, which creates the schema before the first request arrives.
 
 Usage (from backend/):
-    python -m scripts.seed
-    python -m scripts.seed --reset-password boriwat=newsecret
-
-Accounts come from the SEED_USERS env var:
-    SEED_USERS="boriwat:บอ:secret1,fon:ฝน:secret2"     # user:display:password
-If it is unset, random passwords are generated and printed once.
+    python -m scripts.seed --tables-only
+    python -m scripts.seed --demo
+    python -m scripts.seed --reset-password bow=newsecret
 """
 
 import argparse
-import os
 import secrets
 import string
 import sys
@@ -24,51 +21,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from sqlalchemy import select  # noqa: E402
 
 from app.database import Base, SessionLocal, engine  # noqa: E402
-from app.models import Category, CategoryKeyword, User  # noqa: E402
+from app.ledger_defaults import seed_ledger_categories  # noqa: E402
+from app.models import (  # noqa: E402
+    KIND_CASHFLOW,
+    KIND_DEBT,
+    ROLE_EDITOR,
+    ROLE_OWNER,
+    Ledger,
+    LedgerMember,
+    User,
+)
 from app.security import hash_password  # noqa: E402
-
-# --------------------------------------------------------------------------
-# starter category map — edit freely, re-running only adds what is missing
-# --------------------------------------------------------------------------
-CATEGORIES: list[tuple[str, str, int, list[str]]] = [
-    ("อาหาร/เครื่องดื่ม", "🍜", 10, [
-        "เซเว่น", "7-11", "seven", "โลตัส", "lotus", "บิ๊กซี", "big c", "แม็คโคร", "makro",
-        "kfc", "mcdonald", "แมค", "พิซซ่า", "pizza", "starbucks", "สตาร์บัค",
-        "อเมซอน", "amazon", "กาแฟ", "coffee", "ชานม", "ข้าว", "ก๋วยเตี๋ยว",
-        "หมูกระทะ", "ชาบู", "ส้มตำ", "grabfood", "lineman", "foodpanda", "robinhood",
-    ]),
-    ("เดินทาง", "🚗", 20, [
-        "แกร็บ", "grab", "bolt", "taxi", "แท็กซี่", "bts", "mrt", "รถไฟฟ้า",
-        "วิน", "มอเตอร์ไซค์", "น้ำมัน", "ปตท", "ptt", "บางจาก", "shell", "เชลล์",
-        "esso", "caltex", "ทางด่วน", "easy pass", "ที่จอดรถ",
-    ]),
-    ("บ้าน/บิล", "🏠", 30, [
-        "ค่าไฟ", "การไฟฟ้า", "ค่าน้ำ", "การประปา", "ค่าเช่า", "ค่าห้อง", "ส่วนกลาง",
-        "internet", "อินเทอร์เน็ต", "true", "ais", "dtac", "ค่าโทรศัพท์",
-    ]),
-    ("ของใช้ในบ้าน", "🧺", 40, [
-        "watsons", "วัตสัน", "boots", "ikea", "homepro", "โฮมโปร", "ไทวัสดุ",
-        "ผงซักฟอก", "ทิชชู่", "น้ำยา",
-    ]),
-    ("สุขภาพ", "💊", 50, [
-        "โรงพยาบาล", "คลินิก", "ร้านยา", "หมอ", "ทันตกรรม", "ฟิตเนส", "fitness", "ยิม",
-    ]),
-    ("บันเทิง", "🎬", 60, [
-        "netflix", "spotify", "youtube", "disney", "viu", "iqiyi", "เกม", "steam",
-        "โรงหนัง", "major", "หนัง",
-    ]),
-    ("ช้อปปิ้ง", "👕", 70, [
-        "shopee", "ช้อปปี้", "lazada", "ลาซาด้า", "tiktok", "uniqlo", "h&m", "zara",
-        "เสื้อ", "รองเท้า",
-    ]),
-    ("สัตว์เลี้ยง", "🐱", 80, [
-        "อาหารแมว", "อาหารหมา", "petshop", "สัตวแพทย์", "ทรายแมว",
-    ]),
-    ("ของขวัญ/สังสรรค์", "🎁", 90, [
-        "ของขวัญ", "งานแต่ง", "ทำบุญ", "ซองงาน", "วันเกิด",
-    ]),
-    ("อื่นๆ", "💸", 999, []),
-]
 
 
 def random_password(length: int = 12) -> str:
@@ -76,75 +39,70 @@ def random_password(length: int = 12) -> str:
     return "".join(secrets.choice(alphabet) for _ in range(length))
 
 
-def parse_seed_users() -> list[tuple[str, str, str | None]]:
-    raw = os.getenv("SEED_USERS", "").strip()
-    if not raw:
-        return [("boriwat", "บอ", None), ("partner", "แฟน", None)]
+def get_or_create_user(db, username: str, display_name: str, password: str) -> User:
+    user = db.execute(select(User).where(User.username == username)).scalar_one_or_none()
+    if user:
+        print(f"  = ผู้ใช้ {username!r} มีอยู่แล้ว")
+        return user
+    user = User(
+        username=username,
+        display_name=display_name,
+        password_hash=hash_password(password),
+    )
+    db.add(user)
+    db.flush()
+    print(f"  + ผู้ใช้ {username!r} ({display_name})  รหัสผ่าน: {password}")
+    return user
 
-    out: list[tuple[str, str, str | None]] = []
-    for chunk in raw.split(","):
-        chunk = chunk.strip()
-        if not chunk:
-            continue
-        parts = chunk.split(":")
-        if len(parts) != 3:
-            raise SystemExit(f"SEED_USERS รูปแบบผิดที่ {chunk!r} (ต้องเป็น user:display:password)")
-        out.append((parts[0].strip().lower(), parts[1].strip(), parts[2]))
-    return out
+
+def create_ledger(db, owner: User, name: str, kind: str, emoji: str) -> Ledger:
+    existing = db.execute(
+        select(Ledger).where(Ledger.owner_id == owner.id, Ledger.name == name)
+    ).scalar_one_or_none()
+    if existing:
+        print(f"  = สมุด {name!r} มีอยู่แล้ว")
+        return existing
+
+    ledger = Ledger(name=name, kind=kind, emoji=emoji, owner_id=owner.id)
+    db.add(ledger)
+    db.flush()
+    db.add(LedgerMember(ledger_id=ledger.id, user_id=owner.id, role=ROLE_OWNER))
+    seed_ledger_categories(db, ledger.id, kind)
+    print(f"  + สมุด {emoji} {name} ({kind})")
+    return ledger
 
 
-def seed_users(db) -> None:
-    created: list[tuple[str, str]] = []
-    for username, display_name, password in parse_seed_users():
-        existing = db.execute(
-            select(User).where(User.username == username)
-        ).scalar_one_or_none()
-        if existing:
-            print(f"  = user {username!r} มีอยู่แล้ว ข้าม")
-            continue
-        pw = password or random_password()
-        db.add(
-            User(
-                username=username,
-                display_name=display_name,
-                password_hash=hash_password(pw),
+def seed_demo(db) -> None:
+    print("→ ผู้ใช้ตัวอย่าง")
+    bow = get_or_create_user(db, "bow", "บอ", "demo1234")
+    fon = get_or_create_user(db, "fon", "ฝน", "demo1234")
+
+    print("→ สมุดตัวอย่าง")
+    private = create_ledger(db, bow, "ของฉัน", KIND_CASHFLOW, "🔒")
+    shared = create_ledger(db, bow, "บ้านเรา", KIND_CASHFLOW, "🏠")
+    debt = create_ledger(db, bow, "หนี้รถ", KIND_DEBT, "🚙")
+
+    # fon is an editor on the shared book only — the private one and the debt
+    # book stay invisible to them, which is the whole point of the model.
+    for ledger in (shared,):
+        exists = db.execute(
+            select(LedgerMember).where(
+                LedgerMember.ledger_id == ledger.id, LedgerMember.user_id == fon.id
             )
-        )
-        created.append((username, pw if not password else "(จาก SEED_USERS)"))
-        print(f"  + user {username!r} ({display_name})")
-    db.commit()
-
-    generated = [(u, p) for u, p in created if p != "(จาก SEED_USERS)"]
-    if generated:
-        print("\n  ⚠ รหัสผ่านที่สุ่มให้ — แสดงครั้งเดียว เก็บไว้เดี๋ยวนี้:")
-        for username, pw in generated:
-            print(f"      {username} : {pw}")
-        print()
-
-
-def seed_categories(db) -> None:
-    for name, emoji, sort_order, keywords in CATEGORIES:
-        category = db.execute(
-            select(Category).where(Category.name == name)
         ).scalar_one_or_none()
-        if category is None:
-            category = Category(name=name, emoji=emoji, sort_order=sort_order)
-            db.add(category)
-            db.flush()
-            print(f"  + category {emoji} {name}")
-
-        for kw in keywords:
-            kw = kw.lower().strip()
-            exists = db.execute(
-                select(CategoryKeyword).where(CategoryKeyword.keyword == kw)
-            ).scalar_one_or_none()
-            if exists is None:
-                db.add(
-                    CategoryKeyword(
-                        keyword=kw, category_id=category.id, priority=0
-                    )
+        if not exists:
+            db.add(
+                LedgerMember(
+                    ledger_id=ledger.id,
+                    user_id=fon.id,
+                    role=ROLE_EDITOR,
+                    invited_by_id=bow.id,
                 )
+            )
+            print(f"  + เชิญ fon เข้า {ledger.name!r} เป็น editor")
+
     db.commit()
+    print(f"\n  bow เห็น 3 สมุด / fon เห็นแค่ {shared.name!r}")
 
 
 def reset_password(db, spec: str) -> None:
@@ -163,24 +121,27 @@ def reset_password(db, spec: str) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Seed the Bank database")
+    parser.add_argument("--tables-only", action="store_true", help="สร้างตารางอย่างเดียว")
+    parser.add_argument("--demo", action="store_true", help="สร้างผู้ใช้+สมุดตัวอย่าง")
     parser.add_argument("--reset-password", metavar="user=newpass")
-    parser.add_argument(
-        "--skip-users", action="store_true", help="seed แต่หมวดหมู่อย่างเดียว"
-    )
     args = parser.parse_args()
 
     print("→ สร้างตาราง (ถ้ายังไม่มี)")
     Base.metadata.create_all(bind=engine)
 
+    if args.tables_only:
+        print("เสร็จแล้ว")
+        return
+
     with SessionLocal() as db:
         if args.reset_password:
             reset_password(db, args.reset_password)
             return
-        if not args.skip_users:
-            print("→ ผู้ใช้")
-            seed_users(db)
-        print("→ หมวดหมู่ + keywords")
-        seed_categories(db)
+        if args.demo:
+            seed_demo(db)
+        else:
+            print("\nไม่ได้ระบุอะไรเพิ่ม — signup เปิดสาธารณะแล้ว สมัครผ่านหน้าเว็บได้เลย")
+            print("ถ้าอยากได้ข้อมูลตัวอย่างสำหรับ dev ใช้:  python -m scripts.seed --demo")
 
     print("เสร็จแล้ว")
 

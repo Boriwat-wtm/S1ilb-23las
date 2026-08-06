@@ -1,9 +1,11 @@
 import { useState } from 'react'
 
+import ThemePicker from '../components/ThemePicker'
 import { useAuth } from '../auth/AuthContext'
 
 export default function Login() {
   const { login, register } = useAuth()
+  const [themeOpen, setThemeOpen] = useState(false)
   const [mode, setMode] = useState('login')
   const [username, setUsername] = useState('')
   const [displayName, setDisplayName] = useState('')
@@ -115,7 +117,20 @@ export default function Login() {
         <button type="submit" className="btn btn-primary btn-block" disabled={busy}>
           {busy ? 'กำลังดำเนินการ...' : isRegister ? 'สมัครและเข้าใช้' : 'เข้าสู่ระบบ'}
         </button>
+
+        {/* Available before signing in too — this is the first screen anyone
+            sees, so it is the first place a theme is worth changing. */}
+        <button
+          type="button"
+          className="btn btn-quiet btn-sm"
+          onClick={() => setThemeOpen(true)}
+          aria-haspopup="dialog"
+        >
+          ◑ เปลี่ยนธีมสี
+        </button>
       </form>
+
+      <ThemePicker open={themeOpen} onClose={() => setThemeOpen(false)} />
     </main>
   )
 }

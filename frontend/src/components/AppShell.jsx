@@ -3,6 +3,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 
 import LedgerSwitcher, { ShareBadge } from './LedgerSwitcher'
 import Money from './Money'
+import ThemePicker from './ThemePicker'
 import { useAuth } from '../auth/AuthContext'
 import { useLedgers } from '../data/LedgerContext'
 
@@ -17,6 +18,7 @@ export default function AppShell() {
   const { user, logout } = useAuth()
   const { ledgers, current, currentId, select } = useLedgers()
   const [switcherOpen, setSwitcherOpen] = useState(false)
+  const [themeOpen, setThemeOpen] = useState(false)
   const navigate = useNavigate()
 
   const tab = ({ isActive }) => `tab${isActive ? ' active' : ''}`
@@ -48,9 +50,21 @@ export default function AppShell() {
           )}
 
           <span className="spacer" />
-          <span className="t-meta mono" title={`เข้าใช้เป็น ${user?.username}`}>
+          <span className="t-meta mono topbar-user" title={`เข้าใช้เป็น ${user?.username}`}>
             {user?.display_name}
           </span>
+          {/* Reachable from every screen on both layouts — a theme you have to
+              go hunting for in a settings page is a theme nobody changes. */}
+          <button
+            type="button"
+            className="btn btn-quiet btn-sm"
+            onClick={() => setThemeOpen(true)}
+            aria-haspopup="dialog"
+            title="เปลี่ยนธีมสี"
+          >
+            <span aria-hidden="true">◑</span>
+            <span className="sr-only">เปลี่ยนธีมสี</span>
+          </button>
           <button
             type="button"
             className="btn btn-quiet btn-sm"
@@ -123,6 +137,14 @@ export default function AppShell() {
             <NavLink to="/settings" className={railLink}>
               ตั้งค่าสมุด
             </NavLink>
+            <button
+              type="button"
+              className="rail-nav-btn"
+              onClick={() => setThemeOpen(true)}
+              aria-haspopup="dialog"
+            >
+              ธีมสี
+            </button>
           </div>
         </nav>
 
@@ -153,6 +175,7 @@ export default function AppShell() {
       </nav>
 
       <LedgerSwitcher open={switcherOpen} onClose={() => setSwitcherOpen(false)} />
+      <ThemePicker open={themeOpen} onClose={() => setThemeOpen(false)} />
     </div>
   )
 }

@@ -20,6 +20,11 @@
    3. Thai has no uppercase. `text-transform: uppercase` is a no-op here, so
       label hierarchy comes from size, weight, colour and letter-spacing.
       Tracking is applied only where the text is Latin.
+
+   4. The primary button is ink, not a brand hue. Two money colours are already
+      doing semantic work on every screen; a third saturated colour competing
+      with them is what makes finance UIs look cheap. Inverting ink against
+      paper also guarantees the button's contrast in every theme for free.
    ========================================================================== */
 
 :root {
@@ -38,63 +43,197 @@
   --rail-w: 264px;
   --tabbar-h: 58px;
   --measure: 1120px;
-
-  /* --- light --- */
-  --paper: #f4f4f1;
-  --surface: #ffffff;
-  --surface-sunk: #ececea;
-  --rule: #dcdcd7;
-  --rule-strong: #b9b9b2;
-  --ink: #16181c;
-  --ink-2: #55585f;
-  --ink-3: #83868d;
-
-  --accent: #0f766e;
-  --accent-ink: #ffffff;
-  --accent-soft: #dcefec;
-
-  /* Direction of money, not sentiment. See note 2 above. */
-  --credit: #0b6f57;
-  --debit: #a63d24;
-  --credit-soft: #e0f0ea;
-  --debit-soft: #f7e6e1;
-
-  --warn: #8a5a00;
-  --warn-soft: #fdf3dd;
-  --danger: #a3231b;
-  --danger-soft: #fbe9e7;
-
-  --focus: #0f766e;
-
-  color-scheme: light dark;
 }
 
+/* ==========================================================================
+   Themes
+
+   Applied as [data-theme] on <html> by ThemeContext. "auto" carries no
+   attribute value of its own — it simply lets the media query below swap
+   Ivory for Obsidian.
+
+   Every palette holds the same contract:
+     paper < surface-sunk < surface   surfaces, back to front
+     ink > ink-2 > ink-3              text, most to least prominent
+     accent                           links, focus, active state — never a
+                                      money colour, so the two never collide
+     btn-bg / btn-ink                 inverted ink; see note 4
+     credit / debit                   direction of money; see note 2
+
+   ink-3 is the constraint that sets the floor everywhere: it is the smallest,
+   faintest text in the app, so each theme's value is chosen to clear ~4.5:1
+   against its own paper rather than being picked to look pretty in isolation.
+   ========================================================================== */
+
+/* --- Ivory: warm paper, deep pine. The default light theme. --- */
+:root,
+[data-theme='ivory'] {
+  --paper: #f8f6f1;
+  --surface: #ffffff;
+  --surface-sunk: #f0ede5;
+  --rule: #e4dfd3;
+  --rule-strong: #c6bfad;
+  --ink: #191712;
+  --ink-2: #565046;
+  --ink-3: #776f61;
+
+  --accent: #1f5d4d;
+  --accent-ink: #ffffff;
+  --accent-soft: #e3ede9;
+
+  --btn-bg: #191712;
+  --btn-ink: #f8f6f1;
+
+  --credit: #166b4a;
+  --debit: #a03c1f;
+  --credit-soft: #e2efe8;
+  --debit-soft: #f8e8e1;
+
+  --warn: #7d5209;
+  --warn-soft: #fbf2dd;
+  --danger: #9d241a;
+  --danger-soft: #fbe9e6;
+
+  --focus: #1f5d4d;
+
+  color-scheme: light;
+}
+
+/* --- Porcelain: cool white, deep navy. --- */
+[data-theme='porcelain'] {
+  --paper: #f5f7f9;
+  --surface: #ffffff;
+  --surface-sunk: #eaeef3;
+  --rule: #dee4eb;
+  --rule-strong: #bcc5d1;
+  --ink: #0f151d;
+  --ink-2: #495463;
+  /* Darkened from #6b7889, which measured 4.18:1 on this theme's paper.
+     Porcelain's paper is the lightest of the four, so its faint text has the
+     least room and is the value that has to be checked, not eyeballed. */
+  --ink-3: #626d7d;
+
+  --accent: #1c3f66;
+  --accent-ink: #ffffff;
+  --accent-soft: #e3eaf3;
+
+  --btn-bg: #12253b;
+  --btn-ink: #f5f7f9;
+
+  --credit: #0f6553;
+  --debit: #9e3229;
+  --credit-soft: #e0efeb;
+  --debit-soft: #f8e7e5;
+
+  --warn: #7a5410;
+  --warn-soft: #fbf2df;
+  --danger: #9b2820;
+  --danger-soft: #fbe9e7;
+
+  --focus: #1c3f66;
+
+  color-scheme: light;
+}
+
+/* --- Obsidian: near-black, brass. The default dark theme. --- */
+[data-theme='obsidian'] {
+  --paper: #0b0b0c;
+  --surface: #151517;
+  --surface-sunk: #1e1e21;
+  --rule: #2a2a2e;
+  --rule-strong: #404046;
+  --ink: #f2efe8;
+  --ink-2: #aaa59a;
+  --ink-3: #857f74;
+
+  --accent: #c9a227;
+  --accent-ink: #14120c;
+  --accent-soft: #2b2416;
+
+  --btn-bg: #f2efe8;
+  --btn-ink: #151517;
+
+  --credit: #54c295;
+  --debit: #e8846a;
+  --credit-soft: #12291f;
+  --debit-soft: #2c1a14;
+
+  --warn: #e3b45c;
+  --warn-soft: #2b2313;
+  --danger: #f0796d;
+  --danger-soft: #2e1614;
+
+  --focus: #c9a227;
+
+  color-scheme: dark;
+}
+
+/* --- Midnight: deep navy, cool silver-blue. --- */
+[data-theme='midnight'] {
+  --paper: #080d16;
+  --surface: #101725;
+  --surface-sunk: #182133;
+  --rule: #232e45;
+  --rule-strong: #374763;
+  --ink: #e9eef7;
+  --ink-2: #9dabc2;
+  --ink-3: #7d8ba3;
+
+  --accent: #7aa7e0;
+  --accent-ink: #08101d;
+  --accent-soft: #152740;
+
+  --btn-bg: #e9eef7;
+  --btn-ink: #101725;
+
+  --credit: #4ec9a4;
+  --debit: #f0836b;
+  --credit-soft: #0d2a24;
+  --debit-soft: #2c1a15;
+
+  --warn: #e0b768;
+  --warn-soft: #2a2414;
+  --danger: #f2827a;
+  --danger-soft: #2d1719;
+
+  --focus: #7aa7e0;
+
+  color-scheme: dark;
+}
+
+/* Auto: follow the OS. Ivory above already covers the light case. */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --paper: #0d0f13;
-    --surface: #14171d;
-    --surface-sunk: #1b1f27;
-    --rule: #272c36;
-    --rule-strong: #3b424f;
-    --ink: #e9ecf1;
-    --ink-2: #a3aab7;
-    --ink-3: #757d8b;
+  :root:not([data-theme]),
+  [data-theme='auto'] {
+    --paper: #0b0b0c;
+    --surface: #151517;
+    --surface-sunk: #1e1e21;
+    --rule: #2a2a2e;
+    --rule-strong: #404046;
+    --ink: #f2efe8;
+    --ink-2: #aaa59a;
+    --ink-3: #857f74;
 
-    --accent: #17a394;
-    --accent-ink: #04120f;
-    --accent-soft: #12332f;
+    --accent: #c9a227;
+    --accent-ink: #14120c;
+    --accent-soft: #2b2416;
 
-    --credit: #43cfa6;
-    --debit: #f08a6d;
-    --credit-soft: #102e26;
-    --debit-soft: #331a13;
+    --btn-bg: #f2efe8;
+    --btn-ink: #151517;
 
-    --warn: #e5b25a;
-    --warn-soft: #2c2312;
+    --credit: #54c295;
+    --debit: #e8846a;
+    --credit-soft: #12291f;
+    --debit-soft: #2c1a14;
+
+    --warn: #e3b45c;
+    --warn-soft: #2b2313;
     --danger: #f0796d;
-    --danger-soft: #2f1614;
+    --danger-soft: #2e1614;
 
-    --focus: #2dd4bf;
+    --focus: #c9a227;
+
+    color-scheme: dark;
   }
 }
 
@@ -113,10 +252,14 @@ body {
   color: var(--ink);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans Thai",
     "Leelawadee UI", Sarabun, Roboto, sans-serif;
-  font-size: 15px;
-  line-height: 1.55;
+  /* 16px base. Thai needs more vertical room than Latin at the same nominal
+     size — tone marks and vowels stack above and below the line — so both the
+     size and the leading run higher than a Latin-only UI would use. */
+  font-size: 16px;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   overscroll-behavior-y: none;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 /* Every figure in this app is money or a date. Tabular by default so columns
@@ -263,6 +406,14 @@ a {
 
 .spacer {
   flex: 1;
+}
+
+/* The topbar also carries the ledger chip, which can be a long Thai name.
+   Below 480px the display name is the first thing to give up its space. */
+@media (max-width: 479px) {
+  .topbar-user {
+    display: none;
+  }
 }
 
 /* --- ledger identity chip: the "whose book is this" anchor --- */
@@ -465,14 +616,24 @@ a {
   margin-top: auto;
 }
 
-.rail-nav a {
+.rail-nav a,
+.rail-nav-btn {
   padding: var(--s2) var(--s3);
   border-radius: var(--r-control);
   color: var(--ink-2);
   font-size: 0.9rem;
 }
 
-.rail-nav a:hover {
+.rail-nav-btn {
+  font-family: inherit;
+  text-align: left;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.rail-nav a:hover,
+.rail-nav-btn:hover {
   background: var(--surface-sunk);
   color: var(--ink);
 }
@@ -596,9 +757,9 @@ a {
 
 table.ledger {
   width: 100%;
-  min-width: 620px;
+  min-width: 660px;
   border-collapse: collapse;
-  font-size: 0.88rem;
+  font-size: 0.875rem;
 }
 
 table.ledger thead th {
@@ -622,7 +783,7 @@ table.ledger td.right {
 
 table.ledger tbody td {
   border-bottom: 1px solid var(--rule);
-  padding: var(--s2) var(--s3);
+  padding: 10px var(--s3);
   vertical-align: baseline;
 }
 
@@ -793,15 +954,16 @@ textarea::placeholder {
   cursor: default;
 }
 
+/* Ink, not a brand hue — see note 4 at the top of this file. */
 .btn-primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-ink);
+  background: var(--btn-bg);
+  border-color: var(--btn-bg);
+  color: var(--btn-ink);
 }
 
 .btn-primary:hover {
-  filter: brightness(1.08);
-  background: var(--accent);
+  background: var(--btn-bg);
+  opacity: 0.88;
 }
 
 .btn-danger {
@@ -857,8 +1019,8 @@ textarea::placeholder {
 }
 
 .segmented button[aria-pressed="true"] {
-  background: var(--ink);
-  color: var(--paper);
+  background: var(--btn-bg);
+  color: var(--btn-ink);
 }
 
 .segmented.dir button[aria-pressed="true"][data-dir="in"] {
@@ -1008,6 +1170,72 @@ textarea::placeholder {
 /* ================================================ sheet (mobile) ======= */
 .sheet-list {
   padding: 0;
+}
+
+/* ================================================ theme picker ========= */
+.theme-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+}
+
+.theme-option {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--s3);
+  width: 100%;
+  padding: var(--s2) var(--s3);
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--r-control);
+  cursor: pointer;
+}
+
+.theme-option:hover {
+  background: var(--surface-sunk);
+}
+
+.theme-option.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* The theme's own four colours, so the choice is judged on colour and not on
+   a name. Bordered because a swatch whose first stop is near-white would
+   otherwise vanish into a light theme's surface. */
+.theme-swatch {
+  display: grid;
+  grid-template-columns: repeat(4, 12px);
+  height: 26px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.theme-swatch > span {
+  display: block;
+}
+
+.theme-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.theme-name {
+  font-weight: 600;
+}
+
+.theme-check {
+  color: var(--accent);
+  font-weight: 700;
 }
 
 .sheet-backdrop {

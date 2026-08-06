@@ -13,8 +13,10 @@ export default defineConfig({
         short_name: 'Bank',
         description: 'บันทึกรายจ่ายร่วมกันสองคน',
         lang: 'th',
-        theme_color: '#0f766e',
-        background_color: '#0b1220',
+        // The install prompt and splash screen cannot read the runtime theme,
+        // so these are Ivory's paper and ink — the default light theme.
+        theme_color: '#f8f6f1',
+        background_color: '#f8f6f1',
         display: 'standalone',
         orientation: 'portrait',
         start_url: '/',

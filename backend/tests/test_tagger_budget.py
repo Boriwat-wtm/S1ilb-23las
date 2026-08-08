@@ -165,6 +165,22 @@ async def main() -> None:
     check("a failed call is retried rather than remembered", flaky.calls == 2, flaky.calls)
     check("and the retry's answer is used", second.ok and not first.ok)
 
+    print("\n== reset_state must not detach the budget ==")
+    # main.py binds this object once, at import, for /health. Replacing it in
+    # reset_state left the health endpoint reporting a counter that never
+    # moved again — invisible unless something looks for it.
+    reset_state()
+    settings.tagger_max_per_minute = 100
+    settings.tagger_max_per_day = 100
+    held = tagger_module.budget  # what /health holds
+    stub = CountingTagger()
+    install(stub)
+    await suggest_tag("ร้านหลังรีเซ็ต", CATEGORIES)
+    check("the object /health holds is the one that counts",
+          held is tagger_module.budget, "reset_state rebound the global")
+    check("...and it sees the call", held.snapshot()["used_today"] == 1,
+          held.snapshot())
+
     print("\n== the null tagger costs nothing at all ==")
     reset_state()
     tagger_module.get_tagger = original_get_tagger

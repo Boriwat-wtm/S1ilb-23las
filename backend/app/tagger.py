@@ -270,6 +270,11 @@ class _Budget:
             "limit_per_day": settings.tagger_max_per_day,
         }
 
+    def clear(self) -> None:
+        with self._lock:
+            self._minute.clear()
+            self._day.clear()
+
 
 budget = _Budget()
 
@@ -291,11 +296,16 @@ def cache_stats() -> dict[str, int]:
 
 
 def reset_state() -> None:
-    """Test hook — clears the cache and the budget."""
-    global budget
+    """Test hook — clears the cache and the budget.
+
+    Clears the budget in place rather than replacing it. main.py binds this
+    object at import time for /health, so rebinding the name here would leave
+    the health endpoint reporting a detached counter that never moves again —
+    which is exactly what it did before this was fixed.
+    """
     with _cache_lock:
         _cache.clear()
-    budget = _Budget()
+    budget.clear()
 
 
 async def suggest_tag(description: str, categories: list[str]) -> TagSuggestion:

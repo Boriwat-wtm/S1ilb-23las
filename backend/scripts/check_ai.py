@@ -11,6 +11,7 @@ retired, billing not enabled, the API not turned on in the project.
     python -m scripts.check_ai --tagger     # just category guessing
     python -m scripts.check_ai --slip path/to/real-slip.jpg
     python -m scripts.check_ai --compare   # ลองทุกโมเดล free tier แล้วเทียบ
+    python -m scripts.check_ai --models    # ถาม API ว่าคีย์นี้เรียกโมเดลไหนได้บ้าง
 
 With no --slip, Vision is tested against a slip this script draws itself.
 That checks the key, the request shape and the parser end to end, but it says
@@ -25,6 +26,8 @@ import io
 import sys
 import time
 from pathlib import Path
+
+import httpx
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -75,14 +78,24 @@ UNKNOWN_SHOPS = [
     ("การประปานครหลวง", "บ้าน/บิล"),
 ]
 
-# Free-tier models worth comparing. The published docs do not state per-minute
-# limits — Google points at AI Studio for those — so this measures the thing
-# that can be measured here: whether the answers differ, and how slow each is.
+# Worth comparing on a free key. Google does not publish per-model limits —
+# the docs point at AI Studio — so the numbers below came from reading that
+# dashboard directly, and the scores from running this script.
+#
+#   gemma-4-26b-a4b-it     30 RPM   14,400 RPD    10/10 on three runs
+#   gemini-3.1-flash-lite  15 RPM      500 RPD    8, 6, 8
+#   gemini-3.5-flash-lite  15 RPM      500 RPD    7, 6
+#   gemini-3.5-flash        5 RPM       20 RPD    twenty a day is not a tier
+#   gemma-4-31b-it         30 RPM   14,400 RPD    ignores responseSchema
+#
+# The last one is kept in the list on purpose: it fails loudly here rather
+# than quietly in production, and it is the counterexample to "pick the bigger
+# model".
 CANDIDATE_MODELS = [
-    "gemini-3.5-flash-lite",
+    "gemma-4-26b-a4b-it",
     "gemini-3.1-flash-lite",
-    "gemini-2.5-flash-lite",
-    "gemini-3.5-flash",
+    "gemini-3.5-flash-lite",
+    "gemma-4-31b-it",
 ]
 
 
@@ -162,6 +175,55 @@ async def check_vision(slip_path: str | None) -> bool:
     return True
 
 
+async def list_models() -> bool:
+    """Ask the key what it can actually reach.
+
+    Google does not publish per-model free-tier limits — the docs say to look
+    in AI Studio — and the third-party numbers floating around disagree with
+    each other. This is the part that *is* authoritative: the API will say
+    exactly which models this key may call. The per-minute figures still have
+    to be read from aistudio.google.com/rate-limit, which is per account.
+    """
+    print("\n=== โมเดลที่คีย์นี้เรียกได้จริง ===")
+    if not settings.gemini_api_key:
+        print(BAD, "ยังไม่ได้ตั้ง GEMINI_API_KEY ใน backend/.env")
+        return False
+
+    async with httpx.AsyncClient(timeout=20.0) as client:
+        resp = await client.get(
+            "https://generativelanguage.googleapis.com/v1beta/models",
+            params={"key": settings.gemini_api_key, "pageSize": 200},
+        )
+    if resp.status_code != 200:
+        print(BAD, f"เรียกไม่สำเร็จ ({resp.status_code}) {resp.text[:160]}")
+        return False
+
+    models = resp.json().get("models", [])
+    usable = [
+        m
+        for m in models
+        if "generateContent" in m.get("supportedGenerationMethods", [])
+        and "gemini" in m.get("name", "")
+    ]
+    # Newest generations first, lite before full — that ordering is roughly
+    # the order worth trying for a cheap classification job.
+    usable.sort(key=lambda m: m.get("name", ""), reverse=True)
+
+    print(INFO, f"ทั้งหมด {len(models)} โมเดล · เรียก generateContent ได้ {len(usable)}")
+    print(INFO, "")
+    for m in usable:
+        mid = m["name"].removeprefix("models/")
+        if "lite" not in mid and "flash" not in mid:
+            continue
+        limit = m.get("inputTokenLimit", "?")
+        print(INFO, f"  {mid:<44} context {limit:>9}")
+
+    print(INFO, "")
+    print(INFO, "RPM/RPD ของบัญชีคุณดูที่ https://aistudio.google.com/rate-limit")
+    print(INFO, "เอกสาร Google ไม่ประกาศตัวเลขนี้ และ blog ข้างนอกก็ขัดกันเอง")
+    return True
+
+
 async def score_model(model: str) -> tuple[int, int, float, list[str]]:
     """Run the whole shop list through one model. Returns hits, total, seconds
     and the lines to print."""
@@ -229,11 +291,19 @@ async def main() -> int:
         help="โมเดลที่จะลอง คั่นด้วย comma (ไม่ใส่ = ใช้ GEMINI_MODEL)",
     )
     parser.add_argument(
+        "--models",
+        action="store_true",
+        help="ถาม API ว่าคีย์นี้เรียกโมเดลไหนได้ (ไม่กินโควตาการเดา)",
+    )
+    parser.add_argument(
         "--compare",
         action="store_true",
         help="ลองทุกโมเดล free tier กับชุดเดียวกัน แล้วเทียบผล",
     )
     args = parser.parse_args()
+
+    if args.models:
+        return 0 if await list_models() else 1
 
     run_vision = args.vision or not (args.tagger or args.compare)
     run_tagger = args.tagger or args.compare or not args.vision

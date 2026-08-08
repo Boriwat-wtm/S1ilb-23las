@@ -1,0 +1,187 @@
+"""Prove both API keys work, before wiring anything to them.
+
+Neither provider has ever been exercised against the live services — there was
+no key here to test with. This is the first thing to run once there is one,
+because the failure modes are all boring and all easier to read here than
+through the app: a key restricted to the wrong API, a model id that has been
+retired, billing not enabled, the API not turned on in the project.
+
+    python -m scripts.check_ai              # both, using backend/.env
+    python -m scripts.check_ai --vision     # just OCR
+    python -m scripts.check_ai --tagger     # just category guessing
+    python -m scripts.check_ai --slip path/to/real-slip.jpg
+
+With no --slip, Vision is tested against a slip this script draws itself.
+That checks the key, the request shape and the parser end to end, but it says
+nothing about real-world accuracy: a rendered image is clean type on white,
+and a photograph of a phone screen is not. Run it once with --slip and a real
+photo before trusting the numbers it fills in.
+"""
+
+import argparse
+import asyncio
+import io
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from app.config import settings  # noqa: E402
+from app.ocr import GoogleVisionProvider  # noqa: E402
+from app.slip_parser import parse_slip_text  # noqa: E402
+from app.tagger import GeminiTagger  # noqa: E402
+
+OK, BAD, INFO = "  ok  ", " FAIL ", "      "
+
+SLIP_LINES = [
+    ("K PLUS", 34),
+    ("โอนเงินสำเร็จ", 26),
+    ("08 ส.ค. 68  14:23", 22),
+    ("", 10),
+    ("จาก  นาย บอริวัฒน์ ว", 20),
+    ("ธนาคารกสิกรไทย  xxx-x-x1234-x", 18),
+    ("", 10),
+    ("ไปยัง  ร้านกาแฟดอยช้าง", 20),
+    ("พร้อมเพย์  010556xxxx", 18),
+    ("", 14),
+    ("จำนวนเงิน  85.50 บาท", 26),
+    ("ค่าธรรมเนียม  0.00 บาท", 18),
+    ("", 10),
+    ("รหัสอ้างอิง 015082568142312345", 16),
+]
+
+CATEGORIES = [
+    "อาหาร/เครื่องดื่ม", "เดินทาง", "บ้าน/บิล", "ของใช้ในบ้าน",
+    "สุขภาพ", "บันเทิง", "ช้อปปิ้ง", "สัตว์เลี้ยง", "อื่นๆ",
+]
+
+UNKNOWN_SHOPS = [
+    "After You สาขาสยาม",
+    "บริษัท ซีพี ออลล์ จำกัด (มหาชน)",
+    "Tops Daily",
+    "ตัดผม",
+    "ค่างวดรถ Toyota Leasing",
+]
+
+
+def draw_slip() -> bytes:
+    """Render a plausible Thai transfer slip. Clean type, not a photograph."""
+    from PIL import Image, ImageDraw, ImageFont
+
+    width, height = 620, 900
+    img = Image.new("RGB", (width, height), "white")
+    draw = ImageDraw.Draw(img)
+    font_path = r"C:\Windows\Fonts\LeelawUI.ttf"
+
+    y = 60
+    for text, size in SLIP_LINES:
+        if text:
+            try:
+                font = ImageFont.truetype(font_path, size)
+            except OSError:
+                font = ImageFont.load_default()
+            draw.text((50, y), text, font=font, fill=(20, 20, 20))
+        y += size + 18
+
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=92)
+    return buf.getvalue()
+
+
+async def check_vision(slip_path: str | None) -> bool:
+    print("\n=== Google Vision (อ่านสลิป) ===")
+    if not settings.google_vision_api_key:
+        print(BAD, "ยังไม่ได้ตั้ง GOOGLE_VISION_API_KEY ใน backend/.env")
+        return False
+    print(INFO, f"key ...{settings.google_vision_api_key[-6:]}")
+
+    if slip_path:
+        data = Path(slip_path).read_bytes()
+        print(INFO, f"ใช้สลิปจริง: {slip_path} ({len(data):,} bytes)")
+    else:
+        data = draw_slip()
+        print(INFO, f"ใช้สลิปที่วาดขึ้นเอง ({len(data):,} bytes) — ไม่ใช่รูปถ่ายจริง")
+
+    result = await GoogleVisionProvider().extract(data)
+
+    if result.error:
+        print(BAD, result.error)
+        return False
+    if not result.raw_text:
+        print(BAD, "เรียก API ผ่าน แต่ไม่ได้ข้อความกลับมาเลย")
+        return False
+
+    print(OK, "เรียก API สำเร็จ")
+    print(INFO, "--- ข้อความที่อ่านได้ ---")
+    for line in result.raw_text.strip().splitlines()[:20]:
+        print(INFO, f"  {line}")
+
+    parsed = parse_slip_text(result.raw_text)
+    print(INFO, "--- แกะออกมาได้ ---")
+    for label, value in (
+        ("จำนวนเงิน", parsed["amount"]),
+        ("วันเวลา", parsed["occurred_at"]),
+        ("ผู้รับ", parsed["description"]),
+        ("เลขอ้างอิง", parsed["reference"]),
+    ):
+        mark = OK if value is not None else INFO
+        print(mark, f"{label:<12} {value if value is not None else '— อ่านไม่ออก'}")
+
+    # An amount that comes back wrong is worse than one that comes back empty,
+    # so the synthetic case asserts the exact figure it drew.
+    if not slip_path:
+        from decimal import Decimal
+
+        if parsed["amount"] == Decimal("85.50"):
+            print(OK, "ยอดตรงกับที่วาดไว้ (85.50)")
+        else:
+            print(BAD, f"ยอดไม่ตรง — วาดไว้ 85.50 ได้ {parsed['amount']}")
+            return False
+    return True
+
+
+async def check_tagger() -> bool:
+    print("\n=== Gemini (เดาหมวดหมู่) ===")
+    if not settings.gemini_api_key:
+        print(BAD, "ยังไม่ได้ตั้ง GEMINI_API_KEY ใน backend/.env")
+        return False
+    print(INFO, f"key ...{settings.gemini_api_key[-6:]}  model {settings.gemini_model}")
+
+    tagger = GeminiTagger()
+    all_ok = True
+    for shop in UNKNOWN_SHOPS:
+        tag = await tagger.tag(shop, CATEGORIES)
+        if tag.error:
+            print(BAD, f"{shop:<34} {tag.error}")
+            all_ok = False
+            continue
+        print(OK, f"{shop:<34} -> {tag.category_name}   จำคำว่า {tag.keyword!r}")
+    return all_ok
+
+
+async def main() -> int:
+    parser = argparse.ArgumentParser(description="ทดสอบ API key ของ Vision และ Gemini")
+    parser.add_argument("--vision", action="store_true")
+    parser.add_argument("--tagger", action="store_true")
+    parser.add_argument("--slip", metavar="PATH", help="ทดสอบด้วยรูปสลิปจริง")
+    args = parser.parse_args()
+
+    run_vision = args.vision or not args.tagger
+    run_tagger = args.tagger or not args.vision
+
+    results = []
+    if run_vision:
+        results.append(await check_vision(args.slip))
+    if run_tagger:
+        results.append(await check_tagger())
+
+    print()
+    if all(results):
+        print("ผ่านทั้งหมด — ตั้ง OCR_PROVIDER=google และ TAGGER_PROVIDER=gemini ได้เลย")
+        return 0
+    print("มีอันที่ยังไม่ผ่าน ดูข้อความข้างบน")
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(asyncio.run(main()))

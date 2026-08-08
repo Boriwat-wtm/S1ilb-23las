@@ -102,7 +102,10 @@ class GeminiTagger:
     """
 
     name = "gemini"
-    model = "gemini-2.0-flash"
+
+    @property
+    def model(self) -> str:
+        return settings.gemini_model
 
     @property
     def endpoint(self) -> str:
@@ -140,8 +143,16 @@ class GeminiTagger:
             )
 
         if resp.status_code != 200:
+            # 404 here almost always means the model id is wrong or retired,
+            # which is worth saying out loud rather than reporting as a
+            # generic failure — it is fixed by editing GEMINI_MODEL.
+            hint = (
+                f" (ไม่พบโมเดล {self.model!r} — แก้ GEMINI_MODEL ใน .env)"
+                if resp.status_code == 404
+                else ""
+            )
             return TagSuggestion(
-                provider=self.name, error=f"Gemini ตอบ {resp.status_code}"
+                provider=self.name, error=f"Gemini ตอบ {resp.status_code}{hint}"
             )
 
         try:

@@ -139,6 +139,15 @@ python -m tests.test_slip_parser  # 67 checks — อ่านยอด/วั�
 python -m tests.test_keywords     # 43 checks — ตัวกรองคำค้น (กันตารางเน่า)
 ```
 
+### ทดสอบ API key
+
+```bash
+python -m scripts.check_ai                    # ทั้งสองตัว
+python -m scripts.check_ai --slip slip.jpg    # ด้วยรูปสลิปจริง
+```
+
+ถ้าไม่ใส่ `--slip` มันจะวาดสลิปไทยขึ้นมาเองแล้วยิงเข้า Vision — เช็คได้ว่าคีย์ใช้ได้ request ถูกรูป และ parser แกะออก แต่**ไม่ได้บอกความแม่นในโลกจริง** เพราะรูปที่วาดคือตัวพิมพ์คมบนพื้นขาว ส่วนของจริงคือรูปถ่ายหน้าจอมือถือ ต้องรันด้วย `--slip` กับรูปจริงอย่างน้อยหนึ่งครั้งก่อนเชื่อตัวเลข
+
 `tests/smoke.py` เน้นหนักที่ isolation: คนนอกอ่าน/เขียน/ลิสต์/ใช้ category/ขอ signed URL/จัดการสมาชิกไม่ได้ และ entry id ข้ามสมุดไม่ได้
 
 ### Endpoints
@@ -173,6 +182,11 @@ python -m tests.test_keywords     # 43 checks — ตัวกรองคำค
 OCR_PROVIDER=google
 GOOGLE_VISION_API_KEY=AIza...
 ```
+
+**เป็น API key ไม่ใช่ service account** — ข้ามหน้าสร้าง service account กับ IAM role ไปได้เลย
+ตอนสร้างคีย์: **API restrictions** ติ๊กเฉพาะ `Cloud Vision API` · **Application restrictions** เลือก `None`
+(Render free ไม่มี IP ขาออกตายตัว ล็อก IP แล้วพังตอน redeploy ส่วน referrer ใช้กับ server-to-server ไม่ได้)
+สิ่งที่กันความเสียหายจริงคือ API restriction — คีย์หลุดก็เรียกได้แค่ Vision อย่างเดียว
 
 **สถาปัตยกรรม** — `GoogleVisionProvider` ทำแค่แปลงรูปเป็นข้อความ ส่วนการตีความว่าข้อความนั้นแปลว่าอะไรอยู่ใน `app/slip_parser.py` ซึ่งเป็น pure function มีเทสต์ของตัวเอง 40 ข้อ แบ่งแบบนี้เพราะ HTTP call ทดสอบไม่ได้ถ้าไม่มี key กับสลิปจริง เลยดันตรรกะออกมาจากฝั่งนั้นให้มากที่สุด
 
@@ -209,7 +223,10 @@ GOOGLE_VISION_API_KEY=AIza...
 ```
 TAGGER_PROVIDER=gemini
 GEMINI_API_KEY=AIza...
+GEMINI_MODEL=gemini-2.0-flash   # เปลี่ยนได้ถ้าโมเดลถูกเลิกใช้ (อาการ: 404)
 ```
+
+คีย์ Gemini เอาจาก **aistudio.google.com/apikey** ไม่ใช่ Cloud Console — เป็นคีย์ธรรมดา ไม่ต้องผูก service account
 
 > ⚠️ `GeminiTagger` **ยังไม่เคยยิง API จริง** เขียนตาม contract ของ generateContent และ parse แบบระวังไว้แล้ว แต่ต้องลองจริงหนึ่งครั้งก่อนเชื่อ
 

@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     # "none" = a miss stays a miss and the user picks. "gemini" = Google Gemini.
     tagger_provider: str = "none"
     gemini_api_key: str = ""
+    # Configurable because model ids get renamed and retired on Google's
+    # schedule, not ours, and swapping one should not need a code change.
+    gemini_model: str = "gemini-2.0-flash"
 
     # --- display ---
     app_timezone: str = "Asia/Bangkok"

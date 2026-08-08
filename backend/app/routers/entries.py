@@ -393,7 +393,7 @@ def create_entries_batch(
                 version=1,
             )
             db.add(entry)
-            learn_from_entry(db, ledger_id, item.description, item.category_id)
+            learn_from_entry(db, ledger_id, item.description, item.category_id, item.note)
             db.commit()
             if item.slip_ref:
                 seen_refs.add(item.slip_ref)
@@ -458,7 +458,7 @@ def create_entry(payload: EntryCreate, ctx: LedgerWrite, db: DbSession) -> Entry
     db.add(entry)
     # Whatever category the user actually chose is the ground truth the
     # keyword table should have known. Staged in the same transaction.
-    learn_from_entry(db, ledger_id, payload.description, payload.category_id)
+    learn_from_entry(db, ledger_id, payload.description, payload.category_id, payload.note)
     try:
         db.commit()
     except IntegrityError:
@@ -527,7 +527,7 @@ def update_entry(
 
     # Re-filing an entry under a different category is the clearest
     # correction signal there is.
-    learn_from_entry(db, ledger_id, payload.description, payload.category_id)
+    learn_from_entry(db, ledger_id, payload.description, payload.category_id, payload.note)
     db.commit()
     return EntryOut.model_validate(_load(db, ledger_id, entry_id))
 

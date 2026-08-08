@@ -88,25 +88,48 @@ def remember_keyword(
     return row
 
 
+def combined_text(description: str | None, note: str | None) -> str:
+    """The two things a person writes about a purchase, as one haystack.
+
+    A slip gives the payee, which is often the least useful string on it —
+    "บริษัท ซีพี ออลล์ จำกัด (มหาชน)" names a holding company, not lunch. The
+    note is where "ผัดกะเพรา" gets written, and that is the word that actually
+    says which category this is. Matching across both means either one can
+    carry it.
+    """
+    return " ".join(part.strip() for part in (description, note) if part and part.strip())
+
+
 def learn_from_entry(
-    db: Session, ledger_id: int, description: str, category_id: int | None
+    db: Session,
+    ledger_id: int,
+    description: str,
+    category_id: int | None,
+    note: str | None = None,
 ) -> None:
     """Record what the user just taught us by filing this entry.
 
-    Only fires when the guess was *wrong or missing*. If the keyword table
-    already resolves this description to the chosen category there is nothing
-    to learn, and writing anyway would fill the table with duplicates of what
-    it already knows.
+    Only fires when the guess was *wrong or missing*. If the table already
+    resolves this entry to the chosen category there is nothing to learn, and
+    writing anyway would fill it with duplicates of what it knows.
+
+    Both the description and the note are learned, separately, because they
+    are different kinds of signal: one is where the money went, the other is
+    what it bought. "ร้านลุงหนวด" and "ผัดกะเพรา" should each be enough on
+    their own next time, so they become two keywords rather than one phrase
+    that only matches when both appear together.
 
     Never raises: mis-filing an entry because the learner tripped would be a
     far worse outcome than not learning from it.
     """
-    if not category_id or not description:
+    if not category_id:
         return
     try:
-        guessed, _ = suggest_category(db, ledger_id, description)
+        guessed, _ = suggest_category(db, ledger_id, combined_text(description, note))
         if guessed is not None and guessed.id == category_id:
             return
-        remember_keyword(db, ledger_id, category_id, description, KW_LEARNED)
+        for source in (description, note):
+            if source and source.strip():
+                remember_keyword(db, ledger_id, category_id, source, KW_LEARNED)
     except Exception:  # noqa: BLE001
         log.warning("learn_from_entry failed for ledger %s", ledger_id, exc_info=True)

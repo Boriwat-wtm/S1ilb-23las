@@ -557,6 +557,48 @@ check("/health reports the tagger provider", h.get("tagger_provider") == "none",
 check("/health reports the remaining budget",
       h.get("tagger", {}).get("limit_per_day", 0) > 0, h.get("tagger"))
 
+print("\n== the note is a second signal ==")
+# A slip names the payee, which on a 7-Eleven receipt is a holding company.
+# The note is where the person writes what they actually bought.
+PAYEE = "บริษัท ซีพี ออลล์ จำกัด (มหาชน)"
+r = client.get(f"/ledgers/{sid}/categories/suggest",
+               params={"text": PAYEE}, headers=BOW).json()
+check("the payee alone means nothing", r["category"] is None, r)
+
+r = client.get(f"/ledgers/{sid}/categories/suggest",
+               params={"text": PAYEE, "note": "ซื้อกาแฟ"}, headers=BOW).json()
+check("the note carries it", r["category"] and r["category"]["id"] == food_shared, r)
+check("and says which word matched", r["matched_keyword"] == "กาแฟ", r)
+
+# Filing by hand must teach both fields, not just the description, or the
+# next slip from the same shop is a miss again.
+r = client.post(f"/ledgers/{sid}/entries", headers=BOW, json={
+    "occurred_at": "2026-08-11T12:00:00", "description": "ร้านลุงหนวด",
+    "amount": "60", "direction": "out", "note": "ผัดกะเพรา",
+    "category_id": food_shared})
+check("entry with a note saves", r.status_code == 201, r.text)
+
+r = client.get(f"/ledgers/{sid}/categories/suggest",
+               params={"text": "ร้านลุงหนวด"}, headers=BOW).json()
+check("the shop name alone now resolves",
+      r["category"] and r["category"]["id"] == food_shared, r)
+r = client.get(f"/ledgers/{sid}/categories/suggest",
+               params={"text": "ร้านเจ๊หมวย", "note": "ผัดกะเพรา"}, headers=BOW).json()
+check("and so does the dish, at a different shop",
+      r["category"] and r["category"]["id"] == food_shared, r)
+
+detail = client.get(f"/ledgers/{sid}/categories/detail", headers=BOW).json()
+learned = {k["keyword"] for c in detail for k in c["keywords"] if k["source"] == "learned"}
+check("both were stored, separately",
+      "ลุงหนวด" in learned and "ผัดกะเพรา" in learned, sorted(learned))
+
+check("a note-only entry is enough to learn from", client.post(
+    f"/ledgers/{sid}/entries", headers=BOW,
+    json={"occurred_at": "2026-08-11T13:00:00", "description": "โอนเงิน",
+          "amount": "90", "direction": "out", "note": "ค่าหมอฟัน",
+          "category_id": next(c["id"] for c in detail if c["name"] == "สุขภาพ")},
+).status_code == 201)
+
 print("\n== categories and keywords ==")
 detail = client.get(f"/ledgers/{sid}/categories/detail", headers=BOW).json()
 check("detail lists keywords per category",

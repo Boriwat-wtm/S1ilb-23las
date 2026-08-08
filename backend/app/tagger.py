@@ -69,7 +69,9 @@ class TagSuggestion:
 class Tagger(Protocol):
     name: str
 
-    async def tag(self, description: str, categories: list[str]) -> TagSuggestion: ...
+    async def tag(
+        self, description: str, categories: list[str], note: str = ""
+    ) -> TagSuggestion: ...
 
 
 class NullTagger:
@@ -77,7 +79,9 @@ class NullTagger:
 
     name = "none"
 
-    async def tag(self, description: str, categories: list[str]) -> TagSuggestion:
+    async def tag(
+        self, description: str, categories: list[str], note: str = ""
+    ) -> TagSuggestion:
         return TagSuggestion(provider=self.name)
 
 
@@ -86,7 +90,7 @@ PROMPT = """คุณกำลังช่วยจัดหมวดหมู�
 หมวดหมู่ที่มีให้เลือก (ต้องตอบเป็นหนึ่งในนี้เท่านั้น):
 {categories}
 
-รายการ: "{description}"
+รายการ: "{description}"{note_line}
 
 ตอบเป็น JSON อย่างเดียว ไม่ต้องมีคำอธิบายหรือ markdown:
 {{"category": "<ชื่อหมวดจากรายการข้างบน>", "keyword": "<คำสั้นๆ ที่ใช้จำร้านนี้>"}}
@@ -95,7 +99,9 @@ PROMPT = """คุณกำลังช่วยจัดหมวดหมู�
 - เอาเฉพาะชื่อร้าน/แบรนด์ ตัดคำว่า ค่า ซื้อ จ่าย ร้าน บริษัท จำกัด มหาชน สาขา ออก
 - ห้ามเป็นคำกว้างที่ใช้กับร้านไหนก็ได้
 - ยาว 3-40 ตัวอักษร ตัวพิมพ์เล็ก
-- ถ้าคิดคำที่ใช้ซ้ำได้ไม่ออก ให้ใส่ null"""
+- ถ้าคิดคำที่ใช้ซ้ำได้ไม่ออก ให้ใส่ null
+- ถ้าโน้ตบอกชัดกว่าชื่อรายการ (เช่น ชื่อร้านเป็นชื่อบริษัท แต่โน้ตเขียนว่า "ผัดกะเพรา")
+  ให้ยึดโน้ตเป็นหลัก และเอาคำจากโน้ตมาเป็น keyword"""
 
 
 class GeminiTagger:
@@ -125,15 +131,23 @@ class GeminiTagger:
             f"{self.model}:generateContent"
         )
 
-    async def tag(self, description: str, categories: list[str]) -> TagSuggestion:
+    async def tag(
+        self, description: str, categories: list[str], note: str = ""
+    ) -> TagSuggestion:
         if not settings.gemini_api_key:
             return TagSuggestion(provider=self.name, model=self.model, error="ยังไม่ได้ใส่ GEMINI_API_KEY")
         if not categories:
             return TagSuggestion(provider=self.name, model=self.model, error="สมุดนี้ยังไม่มีหมวดหมู่")
 
+        # The two fields go in labelled separately rather than glued together.
+        # Knowing which string is the payee and which is the person's own note
+        # is the whole reason the note helps: it lets the model prefer
+        # "ผัดกะเพรา" over the holding company that processed the payment.
+        clean_note = (note or "").replace('"', "'").strip()[:200]
         prompt = PROMPT.format(
             categories="\n".join(f"- {c}" for c in categories),
             description=description.replace('"', "'")[:200],
+            note_line=f'\nโน้ตที่ผู้ใช้เขียน: "{clean_note}"' if clean_note else "",
         )
         payload = {
             "contents": [{"parts": [{"text": prompt}]}],
@@ -337,7 +351,7 @@ def reset_state() -> None:
 
 
 async def suggest_tag(
-    description: str, categories: list[str], wait: bool = False
+    description: str, categories: list[str], wait: bool = False, note: str = ""
 ) -> TagSuggestion:
     """Run the configured tagger. Always returns; never raises.
 
@@ -350,7 +364,9 @@ async def suggest_tag(
     if not tagger_enabled():
         return TagSuggestion(provider="none")
 
-    key = _cache_key(description, categories)
+    # The note is part of the question, so it is part of the cache key:
+    # the same shop with a different note may deserve a different answer.
+    key = _cache_key(f"{description} \u241f {note}", categories)
     with _cache_lock:
         hit = _cache.get(key)
         if hit is not None:
@@ -377,7 +393,7 @@ async def suggest_tag(
     tagger = make_tagger(model)
     try:
         result = await asyncio.wait_for(
-            tagger.tag(description, categories), timeout=TAG_TIMEOUT_SECONDS
+            tagger.tag(description, categories, note), timeout=TAG_TIMEOUT_SECONDS
         )
     except asyncio.TimeoutError:
         result = TagSuggestion(provider="gemini", model=model, error="เดาหมวดหมู่นานเกินไป")

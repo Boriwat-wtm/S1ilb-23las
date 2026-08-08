@@ -181,10 +181,21 @@ export const apiCategoriesDetail = (ledgerId) =>
  * would otherwise send three or four requests to the model for one entry.
  * Pass it once, when the field is finished.
  */
-export const apiSuggestCategory = (ledgerId, text, { signal, deep = false } = {}) =>
-  api(`/ledgers/${ledgerId}/categories/suggest${qs({ text, deep: deep ? 1 : '' })}`, {
-    signal,
-  })
+export const apiSuggestCategory = (
+  ledgerId,
+  text,
+  { signal, deep = false, note = '' } = {},
+) =>
+  api(
+    `/ledgers/${ledgerId}/categories/suggest${qs({
+      text,
+      // The note is a second signal, and often the better one: a slip names
+      // the payee, but "ผัดกะเพรา" is what says which category it is.
+      note,
+      deep: deep ? 1 : '',
+    })}`,
+    { signal },
+  )
 export const apiCreateCategory = (ledgerId, payload) =>
   api(`/ledgers/${ledgerId}/categories`, { method: 'POST', body: payload })
 export const apiUpdateCategory = (ledgerId, categoryId, payload) =>

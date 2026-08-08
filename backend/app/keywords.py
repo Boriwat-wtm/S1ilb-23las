@@ -28,6 +28,11 @@ GENERIC = {
     "มหาชน", "สาขา", "ที่", "การ", "ของ", "และ", "ใน", "จาก", "ไป", "มา",
     "shop", "store", "co", "ltd", "inc", "the", "and", "for", "pay", "payment",
     "transfer", "total", "baht", "thb",
+    # Note-shaped noise. People write these *about* a purchase rather than
+    # about what it was, and learning them would attach a category to a mood.
+    "แล้ว", "ครั้ง", "อีก", "นิด", "หน่อย", "ด้วย", "นะ", "ครับ", "ค่ะ",
+    "วันนี้", "เมื่อวาน", "พรุ่งนี้", "ตอนเช้า", "ตอนเย็น", "มื้อ",
+    "ยังไม่", "เสร็จ", "เรียบร้อย", "ทดสอบ", "test", "misc", "other",
 }
 
 # Stripped from the front and back before the stem is taken. These are noise

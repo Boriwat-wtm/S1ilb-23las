@@ -110,6 +110,7 @@ export default function EntryForm({
       try {
         applySuggestion(await apiSuggestCategory(currentId, text, {
           signal: controller.signal,
+          note,
         }))
       } catch {
         /* a failed guess is not worth telling anyone about */
@@ -119,7 +120,7 @@ export default function EntryForm({
       clearTimeout(timer)
       controller.abort()
     }
-  }, [description, categoryTouched, currentId, applySuggestion])
+  }, [description, note, categoryTouched, currentId, applySuggestion])
 
   // Once, when the field is finished: allow the AI tagger. One call per new
   // shop rather than one per typing pause — the difference between a free
@@ -127,16 +128,18 @@ export default function EntryForm({
   const askDeep = useCallback(async () => {
     if (categoryTouched || !currentId || categoryId) return
     const text = description.trim()
-    if (!text) return
+    if (!text && !note.trim()) return
     setDeepBusy(true)
     try {
-      applySuggestion(await apiSuggestCategory(currentId, text, { deep: true }))
+      applySuggestion(
+        await apiSuggestCategory(currentId, text, { deep: true, note }),
+      )
     } catch {
       /* silent — the dropdown is right there */
     } finally {
       setDeepBusy(false)
     }
-  }, [categoryTouched, currentId, categoryId, description, applySuggestion])
+  }, [categoryTouched, currentId, categoryId, description, note, applySuggestion])
 
   // --- slip upload ----------------------------------------------------------
   const handleFile = async (event) => {
@@ -337,7 +340,16 @@ export default function EntryForm({
 
       <label className="field">
         <span>หมายเหตุ</span>
-        <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} />
+        <textarea
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          onBlur={askDeep}
+          rows={2}
+          placeholder="เช่น ผัดกะเพรา, ซื้อข้าวให้แม่"
+        />
+        <span className="field-hint">
+          ใช้ช่วยเดาหมวดหมู่ด้วย — บางทีโน้ตบอกชัดกว่าชื่อร้าน
+        </span>
       </label>
 
       <section className="section">

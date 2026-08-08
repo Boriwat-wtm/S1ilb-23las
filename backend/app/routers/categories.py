@@ -3,7 +3,12 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
-from ..categorize import existing_keywords, remember_keyword, suggest_category
+from ..categorize import (
+    combined_text,
+    existing_keywords,
+    remember_keyword,
+    suggest_category,
+)
 from ..deps import DbSession, LedgerRead, LedgerWrite
 from ..keywords import sanitise_keyword, would_shadow
 from ..models import KW_AI, KW_MANUAL, Category, CategoryKeyword, Entry
@@ -97,7 +102,8 @@ def list_categories_detail(ctx: LedgerRead, db: DbSession) -> list[CategoryDetai
 async def suggest(
     ctx: LedgerRead,
     db: DbSession,
-    text: str = Query("", description="ข้อความรายการที่จะเดาหมวดหมู่จาก"),
+    text: str = Query("", description="ชื่อรายการ"),
+    note: str = Query("", description="หมายเหตุ — ใช้เป็นสัญญาณที่สองในการเดา"),
     deep: bool = Query(
         False,
         description="ให้ถาม tagger ได้ถ้า keyword ไม่ตรง — ใช้ตอนพิมพ์เสร็จเท่านั้น",
@@ -115,8 +121,14 @@ async def suggest(
     The tagger is a cache-miss handler either way: its answer is written
     straight back as a keyword, so the same shop is never asked about twice
     and the running cost decays toward nothing.
+
+    Both the name and the note are searched. A slip names the payee, which is
+    frequently the least informative string involved — "บริษัท ซีพี ออลล์
+    จำกัด (มหาชน)" is a holding company, not lunch — while the note is where
+    "ผัดกะเพรา" gets written.
     """
-    category, keyword = suggest_category(db, ctx.ledger.id, text)
+    haystack = combined_text(text, note)
+    category, keyword = suggest_category(db, ctx.ledger.id, haystack)
     if category is not None:
         return CategorySuggestion(
             category=CategoryOut.model_validate(category),
@@ -124,7 +136,7 @@ async def suggest(
             source="keyword",
         )
 
-    if not deep or not text.strip() or not ctx.can_edit:
+    if not deep or not haystack.strip() or not ctx.can_edit:
         return CategorySuggestion()
 
     names = [
@@ -135,7 +147,7 @@ async def suggest(
             .order_by(Category.sort_order)
         ).scalars()
     ]
-    tag = await suggest_tag(text, names)
+    tag = await suggest_tag(text or note, names, note=note if text else "")
     if not tag.ok:
         return CategorySuggestion()
 
@@ -150,7 +162,7 @@ async def suggest(
     # Persist so this costs one call per shop, not one per entry. Refusal is
     # normal and never blocks the suggestion — see app/keywords.py.
     saved = remember_keyword(
-        db, ctx.ledger.id, matched.id, tag.keyword or text, KW_AI, priority=1
+        db, ctx.ledger.id, matched.id, tag.keyword or haystack, KW_AI, priority=1
     )
     if saved is not None:
         try:

@@ -56,7 +56,9 @@ class CountingTagger:
         self.calls = 0
         self.answer = answer
 
-    async def tag(self, description: str, categories: list[str]) -> TagSuggestion:
+    async def tag(
+        self, description: str, categories: list[str], note: str = ""
+    ) -> TagSuggestion:
         self.calls += 1
         return TagSuggestion(
             category_name=self.answer, keyword="stub", provider=self.name
@@ -154,7 +156,7 @@ async def main() -> None:
         def __init__(self) -> None:
             self.calls = 0
 
-        async def tag(self, description, categories):
+        async def tag(self, description, categories, note=""):
             self.calls += 1
             if self.calls == 1:
                 return TagSuggestion(provider=self.name, error="Gemini ตอบ 503")

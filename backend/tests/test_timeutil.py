@@ -9,11 +9,19 @@ functions, where the assertions actually mean something.
 Run: python -m tests.test_timeutil     (from backend/)
 """
 
+import os
 import sys
 from datetime import date, datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+# Never reach a live provider from a test: Settings reads backend/.env,
+# so a real key sitting there would otherwise be spent by a test run.
+os.environ.setdefault("OCR_PROVIDER", "none")
+os.environ.setdefault("GOOGLE_VISION_API_KEY", "")
+os.environ.setdefault("TAGGER_PROVIDER", "none")
+os.environ.setdefault("GEMINI_API_KEY", "")
 
 from app.timeutil import (  # noqa: E402
     LOCAL_TZ,

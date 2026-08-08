@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import Icon from './Icon'
@@ -43,6 +43,8 @@ export default function EntryForm({
   // Once the user picks a category, stop second-guessing them.
   const [categoryTouched, setCategoryTouched] = useState(Boolean(initial?.category))
   const [suggestedBy, setSuggestedBy] = useState(null)
+  const [suggestedBySource, setSuggestedBySource] = useState(null)
+  const [deepBusy, setDeepBusy] = useState(false)
 
   const [slip, setSlip] = useState({
     path: initial?.slip_path ?? null,
@@ -82,23 +84,33 @@ export default function EntryForm({
   )
 
   // --- category auto-suggest ------------------------------------------------
+  const applySuggestion = useCallback((res) => {
+    if (res?.category) {
+      setCategoryId(String(res.category.id))
+      setSuggestedBy(res.matched_keyword)
+      setSuggestedBySource(res.source || null)
+    } else {
+      setSuggestedBy(null)
+      setSuggestedBySource(null)
+    }
+  }, [])
+
+  // While typing: keyword table only. Costs nothing, answers instantly, and
+  // runs on every pause without consequence.
   useEffect(() => {
     if (categoryTouched || !currentId) return undefined
     const text = description.trim()
     if (!text) {
       setSuggestedBy(null)
+      setSuggestedBySource(null)
       return undefined
     }
     const controller = new AbortController()
     const timer = setTimeout(async () => {
       try {
-        const res = await apiSuggestCategory(currentId, text, controller.signal)
-        if (res?.category) {
-          setCategoryId(String(res.category.id))
-          setSuggestedBy(res.matched_keyword)
-        } else {
-          setSuggestedBy(null)
-        }
+        applySuggestion(await apiSuggestCategory(currentId, text, {
+          signal: controller.signal,
+        }))
       } catch {
         /* a failed guess is not worth telling anyone about */
       }
@@ -107,7 +119,24 @@ export default function EntryForm({
       clearTimeout(timer)
       controller.abort()
     }
-  }, [description, categoryTouched, currentId])
+  }, [description, categoryTouched, currentId, applySuggestion])
+
+  // Once, when the field is finished: allow the AI tagger. One call per new
+  // shop rather than one per typing pause — the difference between a free
+  // tier lasting years and lasting a week.
+  const askDeep = useCallback(async () => {
+    if (categoryTouched || !currentId || categoryId) return
+    const text = description.trim()
+    if (!text) return
+    setDeepBusy(true)
+    try {
+      applySuggestion(await apiSuggestCategory(currentId, text, { deep: true }))
+    } catch {
+      /* silent — the dropdown is right there */
+    } finally {
+      setDeepBusy(false)
+    }
+  }, [categoryTouched, currentId, categoryId, description, applySuggestion])
 
   // --- slip upload ----------------------------------------------------------
   const handleFile = async (event) => {
@@ -259,6 +288,7 @@ export default function EntryForm({
           type="text"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
+          onBlur={askDeep}
           placeholder="เช่น กาแฟเซเว่น"
           maxLength={255}
           required
@@ -279,9 +309,10 @@ export default function EntryForm({
         <label className="field">
           <span>
             หมวดหมู่
-            {suggestedBy && !categoryTouched && (
+            {deepBusy && <em className="t-faint" style={{ fontStyle: 'normal', fontSize: '0.72rem' }}>กำลังเดา...</em>}
+            {suggestedBy && !categoryTouched && !deepBusy && (
               <em className="t-faint" style={{ fontStyle: 'normal', fontSize: '0.72rem' }}>
-                เดาจาก “{suggestedBy}”
+                {suggestedBySource === 'ai' ? 'AI เดาให้' : 'เดาจาก'} “{suggestedBy}”
               </em>
             )}
           </span>

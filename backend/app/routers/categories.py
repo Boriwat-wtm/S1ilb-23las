@@ -98,13 +98,23 @@ async def suggest(
     ctx: LedgerRead,
     db: DbSession,
     text: str = Query("", description="ข้อความรายการที่จะเดาหมวดหมู่จาก"),
+    deep: bool = Query(
+        False,
+        description="ให้ถาม tagger ได้ถ้า keyword ไม่ตรง — ใช้ตอนพิมพ์เสร็จเท่านั้น",
+    ),
 ) -> CategorySuggestion:
-    """Keyword table first; the tagger only on a miss.
+    """Keyword table first; the tagger only on a miss, and only when asked.
 
-    The keyword path is instant, free and deterministic, and after a few weeks
-    of use it answers almost everything. The tagger is a cache-miss handler:
-    its answer is written straight back as a keyword, so the same shop is
-    never asked about twice and the cost of running it decays toward nothing.
+    `deep` exists because the entry form calls this on a 400ms debounce while
+    you type. Left to fire freely, one shop name typed with a couple of pauses
+    would send three or four requests to the model — a free tier spent on
+    guessing at half-finished words. So the keyword path runs on every
+    keystroke, for nothing, and the client sets deep=1 once, when the field is
+    finished.
+
+    The tagger is a cache-miss handler either way: its answer is written
+    straight back as a keyword, so the same shop is never asked about twice
+    and the running cost decays toward nothing.
     """
     category, keyword = suggest_category(db, ctx.ledger.id, text)
     if category is not None:
@@ -114,7 +124,7 @@ async def suggest(
             source="keyword",
         )
 
-    if not text.strip() or not ctx.can_edit:
+    if not deep or not text.strip() or not ctx.can_edit:
         return CategorySuggestion()
 
     names = [

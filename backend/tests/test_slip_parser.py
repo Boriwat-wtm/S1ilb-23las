@@ -8,12 +8,20 @@ against text shaped like what the major Thai banks actually print.
 Run: python -m tests.test_slip_parser     (from backend/)
 """
 
+import os
 import sys
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+# Never reach a live provider from a test: Settings reads backend/.env,
+# so a real key sitting there would otherwise be spent by a test run.
+os.environ.setdefault("OCR_PROVIDER", "none")
+os.environ.setdefault("GOOGLE_VISION_API_KEY", "")
+os.environ.setdefault("TAGGER_PROVIDER", "none")
+os.environ.setdefault("GEMINI_API_KEY", "")
 
 from app.slip_parser import (  # noqa: E402
     BKK,

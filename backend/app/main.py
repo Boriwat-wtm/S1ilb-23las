@@ -8,6 +8,8 @@ from sqlalchemy import text
 from .config import settings
 from .database import Base, engine
 from .routers import auth, categories, entries, ledgers, slips
+from .tagger import budget as tagger_budget
+from .tagger import cache_stats as tagger_cache_stats
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("bank")
@@ -69,6 +71,10 @@ def health() -> dict:
         "database": db_status,
         "storage": "configured" if settings.storage_enabled else "disabled",
         "ocr_provider": settings.ocr_provider,
+        # Exposed so "why did it stop guessing categories" is answerable
+        # without reading logs — usually the answer is the daily budget.
+        "tagger_provider": settings.tagger_provider,
+        "tagger": {**tagger_budget.snapshot(), **tagger_cache_stats()},
         "timezone": settings.app_timezone,
     }
 

@@ -31,6 +31,9 @@ import asyncio
 import json
 import logging
 import re
+import threading
+import time
+from collections import OrderedDict, deque
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -41,6 +44,7 @@ from .config import settings
 log = logging.getLogger("bank.tagger")
 
 TAG_TIMEOUT_SECONDS = 8.0
+CACHE_MAX = 2048
 
 
 @dataclass
@@ -221,20 +225,122 @@ def get_tagger() -> Tagger:
     return _TAGGERS.get(settings.tagger_provider.lower(), NullTagger)()
 
 
+class _Budget:
+    """Self-imposed call ceiling, per minute and per day.
+
+    Not a copy of the provider's limit — a lower one. Collecting a 429 means
+    the request already went out and was refused; refusing it here means the
+    user sees a category they have to pick themselves, which is the same
+    outcome they get today with the tagger switched off. One is a failure, the
+    other is just the feature not firing.
+
+    In-process, like the auth rate limiter: counters reset on deploy and are
+    not shared across instances. Render free runs one instance, so it holds.
+    """
+
+    def __init__(self) -> None:
+        self._minute: deque[float] = deque()
+        self._day: deque[float] = deque()
+        self._lock = threading.Lock()
+
+    def take(self) -> bool:
+        now = time.monotonic()
+        with self._lock:
+            while self._minute and self._minute[0] < now - 60:
+                self._minute.popleft()
+            while self._day and self._day[0] < now - 86_400:
+                self._day.popleft()
+            if len(self._minute) >= settings.tagger_max_per_minute:
+                return False
+            if len(self._day) >= settings.tagger_max_per_day:
+                return False
+            self._minute.append(now)
+            self._day.append(now)
+            return True
+
+    def snapshot(self) -> dict[str, int]:
+        now = time.monotonic()
+        with self._lock:
+            minute = sum(1 for t in self._minute if t >= now - 60)
+            day = sum(1 for t in self._day if t >= now - 86_400)
+        return {
+            "used_this_minute": minute,
+            "used_today": day,
+            "limit_per_minute": settings.tagger_max_per_minute,
+            "limit_per_day": settings.tagger_max_per_day,
+        }
+
+
+budget = _Budget()
+
+# Same shop, same answer — asking twice is pure waste. Negative results are
+# cached too: a description the model could not place will not become
+# placeable by asking again, and re-asking is exactly what a user retyping the
+# same thing would trigger.
+_cache: OrderedDict[tuple, TagSuggestion] = OrderedDict()
+_cache_lock = threading.Lock()
+
+
+def _cache_key(description: str, categories: list[str]) -> tuple:
+    return (" ".join(description.lower().split()), tuple(categories))
+
+
+def cache_stats() -> dict[str, int]:
+    with _cache_lock:
+        return {"cached": len(_cache)}
+
+
+def reset_state() -> None:
+    """Test hook — clears the cache and the budget."""
+    global budget
+    with _cache_lock:
+        _cache.clear()
+    budget = _Budget()
+
+
 async def suggest_tag(description: str, categories: list[str]) -> TagSuggestion:
     """Run the configured tagger. Always returns; never raises.
 
-    A category guess is a convenience. If the model is down, slow, or
-    nonsensical, the user picks from a dropdown exactly as they do today —
+    A category guess is a convenience. If the model is down, slow, throttled
+    or nonsensical, the user picks from a dropdown exactly as they do today —
     nothing about saving an entry depends on this working.
     """
     tagger = get_tagger()
+    if isinstance(tagger, NullTagger):
+        return TagSuggestion(provider=tagger.name)
+
+    key = _cache_key(description, categories)
+    with _cache_lock:
+        hit = _cache.get(key)
+        if hit is not None:
+            _cache.move_to_end(key)
+            return hit
+
+    if not budget.take():
+        # Deliberately not an error: the caller shows no suggestion, which is
+        # indistinguishable from the model having nothing to say.
+        log.info("tagger budget exhausted; skipping %r", description[:40])
+        return TagSuggestion(provider=tagger.name)
+
     try:
-        return await asyncio.wait_for(
+        result = await asyncio.wait_for(
             tagger.tag(description, categories), timeout=TAG_TIMEOUT_SECONDS
         )
     except asyncio.TimeoutError:
-        return TagSuggestion(provider=tagger.name, error="เดาหมวดหมู่นานเกินไป")
+        result = TagSuggestion(provider=tagger.name, error="เดาหมวดหมู่นานเกินไป")
     except Exception as exc:  # noqa: BLE001
         log.warning("tagger failed", exc_info=True)
-        return TagSuggestion(provider=tagger.name, error=f"เดาหมวดหมู่ไม่สำเร็จ ({type(exc).__name__})")
+        result = TagSuggestion(
+            provider=tagger.name, error=f"เดาหมวดหมู่ไม่สำเร็จ ({type(exc).__name__})"
+        )
+
+    # Transport failures are not cached — the next attempt may well succeed,
+    # and caching a timeout would make one bad minute permanent.
+    if result.ok or result.error is None:
+        with _cache_lock:
+            _cache[key] = result
+            _cache.move_to_end(key)
+            while len(_cache) > CACHE_MAX:
+                _cache.popitem(last=False)
+
+    return result

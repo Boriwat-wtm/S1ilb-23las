@@ -42,6 +42,11 @@ class Settings(BaseSettings):
     # "none" = a miss stays a miss and the user picks. "gemini" = Google Gemini.
     tagger_provider: str = "none"
     gemini_api_key: str = ""
+    # Self-imposed ceilings, well under any provider's free tier. The point is
+    # to degrade to "no suggestion" on our side rather than collect a 429 from
+    # theirs — a quiet miss is invisible, a rate-limit error is not.
+    tagger_max_per_minute: int = 8
+    tagger_max_per_day: int = 200
     # Configurable because model ids get renamed and retired on Google's
     # schedule, not ours, and swapping one should not need a code change —
     # the previous default here, gemini-2.0-flash, has already been shut down.

@@ -29,7 +29,18 @@ DB_FILE.unlink(missing_ok=True)
 os.environ["DATABASE_URL"] = f"sqlite:///{DB_FILE.as_posix()}"
 os.environ["JWT_SECRET"] = "smoke-secret"
 os.environ["CORS_ORIGINS"] = "http://localhost:5173"
+
+# Every outbound integration is pinned off, and the keys are blanked.
+#
+# Settings reads backend/.env, so once a real key is in there a test run will
+# quietly start calling Google and spending the account's quota — which is
+# exactly what happened the first time this section ran. Naming all of them
+# here, rather than only the ones the tests happen to touch, means adding a
+# provider later cannot silently reintroduce that.
 os.environ["OCR_PROVIDER"] = "none"
+os.environ["GOOGLE_VISION_API_KEY"] = ""
+os.environ["TAGGER_PROVIDER"] = "none"
+os.environ["GEMINI_API_KEY"] = ""
 os.environ["SUPABASE_URL"] = ""
 os.environ["SUPABASE_SERVICE_KEY"] = ""
 
@@ -526,6 +537,25 @@ check("re-filing an entry teaches the table too",
 
 check("nothing is learned when the guess was already right",
       client.get(f"/ledgers/{sid}/categories/detail", headers=BOW).status_code == 200)
+
+print("\n== the tagger is opt-in, not automatic ==")
+# The form calls suggest on every typing pause. If those could reach the model
+# a single shop name would cost several calls, which is how a free tier is
+# spent in a week rather than a year.
+r = client.get(f"/ledgers/{sid}/categories/suggest",
+               params={"text": "ร้านที่ไม่มีใครรู้จักเลยจริงๆ"}, headers=BOW)
+check("a miss without deep is just a miss", r.json()["category"] is None, r.text)
+check("...and says nothing about a source", r.json().get("source") is None, r.json())
+r = client.get(f"/ledgers/{sid}/categories/suggest",
+               params={"text": "ร้านที่ไม่มีใครรู้จักเลยจริงๆ", "deep": 1}, headers=BOW)
+check("deep=1 is accepted even with no tagger configured", r.status_code == 200, r.text)
+check("...and still returns nothing when the tagger is off",
+      r.json()["category"] is None, r.json())
+
+h = client.get("/health").json()
+check("/health reports the tagger provider", h.get("tagger_provider") == "none", h)
+check("/health reports the remaining budget",
+      h.get("tagger", {}).get("limit_per_day", 0) > 0, h.get("tagger"))
 
 print("\n== categories and keywords ==")
 detail = client.get(f"/ledgers/{sid}/categories/detail", headers=BOW).json()

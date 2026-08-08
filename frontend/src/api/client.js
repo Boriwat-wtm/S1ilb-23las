@@ -175,8 +175,16 @@ export const apiRemoveMember = (ledgerId, memberId) =>
 export const apiCategories = (ledgerId) => api(`/ledgers/${ledgerId}/categories`)
 export const apiCategoriesDetail = (ledgerId) =>
   api(`/ledgers/${ledgerId}/categories/detail`)
-export const apiSuggestCategory = (ledgerId, text, signal) =>
-  api(`/ledgers/${ledgerId}/categories/suggest${qs({ text })}`, { signal })
+/**
+ * `deep` lets the server consult the AI tagger when the keyword table misses.
+ * Left off while typing — a 400ms debounce on a shop name typed with pauses
+ * would otherwise send three or four requests to the model for one entry.
+ * Pass it once, when the field is finished.
+ */
+export const apiSuggestCategory = (ledgerId, text, { signal, deep = false } = {}) =>
+  api(`/ledgers/${ledgerId}/categories/suggest${qs({ text, deep: deep ? 1 : '' })}`, {
+    signal,
+  })
 export const apiCreateCategory = (ledgerId, payload) =>
   api(`/ledgers/${ledgerId}/categories`, { method: 'POST', body: payload })
 export const apiUpdateCategory = (ledgerId, categoryId, payload) =>

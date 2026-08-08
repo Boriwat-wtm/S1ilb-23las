@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 
-import LedgerSwitcher, { ShareBadge } from './LedgerSwitcher'
+import Icon from './Icon'
+import LedgerSwitcher, { ShareBadge, ledgerGlyph } from './LedgerSwitcher'
 import Money from './Money'
 import ThemePicker from './ThemePicker'
 import { useAuth } from '../auth/AuthContext'
@@ -22,7 +23,7 @@ export default function AppShell() {
   const navigate = useNavigate()
 
   const tab = ({ isActive }) => `tab${isActive ? ' active' : ''}`
-  const railLink = ({ isActive }) => (isActive ? 'active' : undefined)
+  const railLink = ({ isActive }) => `rail-nav-item${isActive ? ' active' : ''}`
 
   return (
     <div className="shell">
@@ -37,12 +38,10 @@ export default function AppShell() {
               onClick={() => setSwitcherOpen(true)}
               aria-haspopup="dialog"
             >
-              <span aria-hidden="true">
-                {current.emoji || (current.kind === 'debt' ? '📉' : '📘')}
-              </span>
+              {ledgerGlyph(current)}
               <span className="ledger-chip-name">{current.name}</span>
               <ShareBadge ledger={current} />
-              <span className="ledger-chip-caret" aria-hidden="true">▾</span>
+              <Icon name="chevronDown" size={15} className="ledger-chip-caret" />
               <span className="sr-only">เปลี่ยนสมุด</span>
             </button>
           ) : (
@@ -57,23 +56,25 @@ export default function AppShell() {
               go hunting for in a settings page is a theme nobody changes. */}
           <button
             type="button"
-            className="btn btn-quiet btn-sm"
+            className="btn btn-quiet btn-icon"
             onClick={() => setThemeOpen(true)}
             aria-haspopup="dialog"
             title="เปลี่ยนธีมสี"
           >
-            <span aria-hidden="true">◑</span>
+            <Icon name="contrast" size={18} />
             <span className="sr-only">เปลี่ยนธีมสี</span>
           </button>
           <button
             type="button"
-            className="btn btn-quiet btn-sm"
+            className="btn btn-quiet btn-icon"
             onClick={() => {
               logout()
               navigate('/')
             }}
+            title="ออกจากระบบ"
           >
-            ออก
+            <Icon name="logout" size={18} />
+            <span className="sr-only">ออกจากระบบ</span>
           </button>
         </div>
       </header>
@@ -84,7 +85,8 @@ export default function AppShell() {
             <div className="rail-head">
               <span className="t-label">สมุดของคุณ</span>
               <NavLink to="/ledgers/new" className="btn btn-quiet btn-sm">
-                + ใหม่
+                <Icon name="plus" size={15} />
+                ใหม่
               </NavLink>
             </div>
           </div>
@@ -101,9 +103,7 @@ export default function AppShell() {
                   }}
                   aria-current={l.id === currentId ? 'true' : undefined}
                 >
-                  <span aria-hidden="true">
-                    {l.emoji || (l.kind === 'debt' ? '📉' : '📘')}
-                  </span>
+                  {ledgerGlyph(l)}
                   <span className="rail-item-name">
                     <span className="rail-item-title">{l.name}</span>
                     <ShareBadge ledger={l} />
@@ -126,28 +126,25 @@ export default function AppShell() {
 
           <div className="rail-nav">
             <NavLink to="/" end className={railLink}>
+              <Icon name="list" size={18} />
               รายการ
             </NavLink>
             <NavLink to="/summary" className={railLink}>
+              <Icon name="chart" size={18} />
               สรุป
             </NavLink>
             <NavLink to="/members" className={railLink}>
+              <Icon name="users" size={18} />
               สมาชิก
             </NavLink>
             <NavLink to="/settings" className={railLink}>
+              <Icon name="gear" size={18} />
               ตั้งค่าสมุด
             </NavLink>
             <NavLink to="/account" className={railLink}>
+              <Icon name="user" size={18} />
               บัญชีของฉัน
             </NavLink>
-            <button
-              type="button"
-              className="rail-nav-btn"
-              onClick={() => setThemeOpen(true)}
-              aria-haspopup="dialog"
-            >
-              ธีมสี
-            </button>
           </div>
         </nav>
 
@@ -160,22 +157,22 @@ export default function AppShell() {
 
       <nav className="tabbar" aria-label="เมนูหลัก">
         <NavLink to="/" end className={tab}>
-          <span className="tab-glyph" aria-hidden="true">☰</span>
+          <Icon name="list" size={21} />
           <span>รายการ</span>
         </NavLink>
         <NavLink to="/new" className={tab}>
-          <span className="tab-glyph" aria-hidden="true">＋</span>
+          <Icon name="plus" size={21} />
           <span>เพิ่ม</span>
         </NavLink>
         <NavLink to="/summary" className={tab}>
-          <span className="tab-glyph" aria-hidden="true">▤</span>
+          <Icon name="chart" size={21} />
           <span>สรุป</span>
         </NavLink>
         {/* Four slots cannot hold members, ledger settings and account, so the
             last one opens the list that does. Before this, ledger settings had
             no route to it at all on a phone. */}
         <NavLink to="/more" className={tab}>
-          <span className="tab-glyph" aria-hidden="true">⋯</span>
+          <Icon name="more" size={21} />
           <span>เพิ่มเติม</span>
         </NavLink>
       </nav>

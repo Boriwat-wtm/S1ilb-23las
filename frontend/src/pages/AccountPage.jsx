@@ -1,15 +1,16 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
+import Icon from '../components/Icon'
+import { ledgerGlyph } from '../components/LedgerSwitcher'
 import Money from '../components/Money'
+import { ThemeOptions } from '../components/ThemePicker'
 import { useAuth } from '../auth/AuthContext'
 import { useLedgers } from '../data/LedgerContext'
-import { useTheme } from '../theme/ThemeContext'
 
 export default function AccountPage() {
   const { user, logout, updateProfile, changePassword } = useAuth()
   const { ledgers } = useLedgers()
-  const { theme, setTheme, themes } = useTheme()
   const navigate = useNavigate()
 
   const [displayName, setDisplayName] = useState(user?.display_name ?? '')
@@ -125,31 +126,7 @@ export default function AccountPage() {
           <h2 className="t-heading">ธีมสี</h2>
           <span className="t-label">เก็บไว้ในเครื่องนี้</span>
         </div>
-        <ul className="theme-list">
-          {themes.map((t) => (
-            <li key={t.id}>
-              <button
-                type="button"
-                className={`theme-option${theme === t.id ? ' active' : ''}`}
-                onClick={() => setTheme(t.id)}
-                aria-pressed={theme === t.id}
-              >
-                <span className="theme-swatch" aria-hidden="true">
-                  {t.swatch.map((c, i) => (
-                    <span key={i} style={{ background: c }} />
-                  ))}
-                </span>
-                <span className="theme-text">
-                  <span className="theme-name">{t.name}</span>
-                  <span className="t-meta">{t.hint}</span>
-                </span>
-                <span className="theme-check" aria-hidden="true">
-                  {theme === t.id ? '✓' : ''}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
+        <ThemeOptions />
       </section>
 
       {/* --- password ------------------------------------------------------- */}
@@ -213,7 +190,7 @@ export default function AccountPage() {
         <ul className="rows">
           {owned.map((l) => (
             <li key={l.id}>
-              <span aria-hidden="true">{l.emoji}</span>
+              {ledgerGlyph(l)}
               <span className="grow">
                 <span className="rail-item-title">{l.name}</span>
                 <span className="t-faint" style={{ fontSize: '0.76rem' }}>
@@ -231,7 +208,7 @@ export default function AccountPage() {
           ))}
           {guest.map((l) => (
             <li key={l.id}>
-              <span aria-hidden="true">{l.emoji}</span>
+              {ledgerGlyph(l)}
               <span className="grow">
                 <span className="rail-item-title">{l.name}</span>
                 <span className="t-faint" style={{ fontSize: '0.76rem' }}>

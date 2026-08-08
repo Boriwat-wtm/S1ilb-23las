@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 
+import Icon from './Icon'
 import Money from './Money'
 import { dayKey, fmtDateShort, withRunningBalance } from '../utils/format'
 
@@ -49,7 +50,16 @@ export default function EntryTable({ entries, filterBalance, words, showRunning 
                 </td>
                 <td className="desc-cell">
                   <Link to={`/entry/${e.id}`}>{e.description}</Link>
-                  {e.slip_path && <span title="มีสลิปแนบ"> 📎</span>}
+                  {e.slip_path && (
+                    <Icon
+                      name="paperclip"
+                      size={13}
+                      className="entry-clip"
+                      role="img"
+                      aria-hidden={undefined}
+                      aria-label="มีสลิปแนบ"
+                    />
+                  )}
                   {e.note && <div className="t-meta">{e.note}</div>}
                 </td>
                 <td className="t-dim">

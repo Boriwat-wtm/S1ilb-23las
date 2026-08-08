@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 
+import Icon from '../components/Icon'
 import { ShareBadge } from '../components/LedgerSwitcher'
 import { useAuth } from '../auth/AuthContext'
 import { useLedgers } from '../data/LedgerContext'
@@ -12,6 +13,32 @@ import { useLedgers } from '../data/LedgerContext'
  * page is the fourth slot: everything the rail holds, in a list. Without it,
  * ledger settings were simply unreachable on a phone.
  */
+function Row({ to, onClick, icon, title, hint }) {
+  const body = (
+    <>
+      <span className="link-glyph">
+        <Icon name={icon} size={19} />
+      </span>
+      <span className="grow">
+        <span className="link-title">{title}</span>
+        <span className="t-meta">{hint}</span>
+      </span>
+      {to && <Icon name="chevronRight" size={17} className="link-caret" />}
+    </>
+  )
+  return (
+    <li>
+      {to ? (
+        <Link to={to}>{body}</Link>
+      ) : (
+        <button type="button" onClick={onClick}>
+          {body}
+        </button>
+      )}
+    </li>
+  )
+}
+
 export default function MorePage() {
   const { current, isOwner } = useLedgers()
   const { user, logout } = useAuth()
@@ -29,28 +56,22 @@ export default function MorePage() {
             <ShareBadge ledger={current} />
           </div>
           <ul className="link-list">
-            <li>
-              <Link to="/members">
-                <span className="link-glyph" aria-hidden="true">👥</span>
-                <span className="grow">
-                  <span className="link-title">สมาชิก</span>
-                  <span className="t-meta">ดูว่าใครเห็นสมุดนี้ และเชิญคนเพิ่ม</span>
-                </span>
-                <span className="link-caret" aria-hidden="true">›</span>
-              </Link>
-            </li>
-            <li>
-              <Link to="/settings">
-                <span className="link-glyph" aria-hidden="true">⚙</span>
-                <span className="grow">
-                  <span className="link-title">ตั้งค่าสมุด</span>
-                  <span className="t-meta">
-                    {isOwner ? 'ชื่อ ไอคอน เก็บเข้าคลัง ลบสมุด' : 'ดูข้อมูลสมุด (เจ้าของเท่านั้นที่แก้ได้)'}
-                  </span>
-                </span>
-                <span className="link-caret" aria-hidden="true">›</span>
-              </Link>
-            </li>
+            <Row
+              to="/members"
+              icon="users"
+              title="สมาชิก"
+              hint="ดูว่าใครเห็นสมุดนี้ และเชิญคนเพิ่ม"
+            />
+            <Row
+              to="/settings"
+              icon="gear"
+              title="ตั้งค่าสมุด"
+              hint={
+                isOwner
+                  ? 'ชื่อ ไอคอน เก็บเข้าคลัง ลบสมุด'
+                  : 'ดูข้อมูลสมุด (เจ้าของเท่านั้นที่แก้ได้)'
+              }
+            />
           </ul>
         </section>
       )}
@@ -60,16 +81,12 @@ export default function MorePage() {
           <h2 className="t-heading">สมุด</h2>
         </div>
         <ul className="link-list">
-          <li>
-            <Link to="/ledgers/new">
-              <span className="link-glyph" aria-hidden="true">＋</span>
-              <span className="grow">
-                <span className="link-title">สร้างสมุดใหม่</span>
-                <span className="t-meta">รายรับ–รายจ่าย หรือ ยอดหนี้</span>
-              </span>
-              <span className="link-caret" aria-hidden="true">›</span>
-            </Link>
-          </li>
+          <Row
+            to="/ledgers/new"
+            icon="plus"
+            title="สร้างสมุดใหม่"
+            hint="รายรับ–รายจ่าย หรือ ยอดหนี้"
+          />
         </ul>
       </section>
 
@@ -78,27 +95,13 @@ export default function MorePage() {
           <h2 className="t-heading">บัญชี</h2>
         </div>
         <ul className="link-list">
-          <li>
-            <Link to="/account">
-              <span className="link-glyph" aria-hidden="true">◑</span>
-              <span className="grow">
-                <span className="link-title">บัญชีของฉัน</span>
-                <span className="t-meta">
-                  {user?.display_name} · ธีมสี · รหัสผ่าน
-                </span>
-              </span>
-              <span className="link-caret" aria-hidden="true">›</span>
-            </Link>
-          </li>
-          <li>
-            <button type="button" onClick={logout}>
-              <span className="link-glyph" aria-hidden="true">⏻</span>
-              <span className="grow">
-                <span className="link-title">ออกจากระบบ</span>
-                <span className="t-meta">เฉพาะเครื่องนี้</span>
-              </span>
-            </button>
-          </li>
+          <Row
+            to="/account"
+            icon="user"
+            title="บัญชีของฉัน"
+            hint={`${user?.display_name} · ธีมสี · รหัสผ่าน`}
+          />
+          <Row onClick={logout} icon="logout" title="ออกจากระบบ" hint="เฉพาะเครื่องนี้" />
         </ul>
       </section>
     </div>

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 
+import Icon from './Icon'
 import Money from './Money'
 import { dayKey, entryEffect, fmtDayFull, fmtTime } from '../utils/format'
 
@@ -30,21 +31,31 @@ export default function EntryList({ entries }) {
           </header>
           <ul className="entry-list">
             {day.items.map((e) => (
-              <li key={e.id} className="entry-row">
-                <span className="entry-glyph" aria-hidden="true">
-                  {e.category?.emoji || (e.direction === 'in' ? '↙' : '↗')}
-                </span>
-                <span className="entry-main">
-                  <Link to={`/entry/${e.id}`} className="entry-desc" style={{ display: 'block' }}>
-                    {e.description}
-                    {e.slip_path && <span title="มีสลิปแนบ"> 📎</span>}
-                  </Link>
-                  <span className="entry-meta">
-                    {e.category?.name || 'ไม่ระบุหมวด'} · {e.created_by.display_name} ·{' '}
-                    {fmtTime(e.occurred_at)}
+              <li key={e.id}>
+                <Link to={`/entry/${e.id}`} className="entry-row">
+                  <span className="entry-glyph">
+                    {e.category?.emoji ? (
+                      <span className="glyph-emoji" aria-hidden="true">
+                        {e.category.emoji}
+                      </span>
+                    ) : (
+                      <Icon name={e.direction === 'in' ? 'arrowIn' : 'arrowOut'} size={18} />
+                    )}
                   </span>
-                </span>
-                <Money value={e.amount} direction={e.direction} />
+                  <span className="entry-main">
+                    <span className="entry-desc">
+                      {e.description}
+                      {e.slip_path && (
+                        <Icon name="paperclip" size={13} className="entry-clip" />
+                      )}
+                    </span>
+                    <span className="entry-meta">
+                      {e.category?.name || 'ไม่ระบุหมวด'} · {e.created_by.display_name} ·{' '}
+                      {fmtTime(e.occurred_at)}
+                    </span>
+                  </span>
+                  <Money value={e.amount} direction={e.direction} />
+                </Link>
               </li>
             ))}
           </ul>

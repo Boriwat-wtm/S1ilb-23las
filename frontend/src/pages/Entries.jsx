@@ -3,7 +3,9 @@ import { Link } from 'react-router-dom'
 
 import EntryList from '../components/EntryList'
 import EntryTable from '../components/EntryTable'
+import Icon from '../components/Icon'
 import Money from '../components/Money'
+import SkeletonRows from '../components/Skeleton'
 import { apiEntries } from '../api/client'
 import { useLedgers } from '../data/LedgerContext'
 import { currentMonth, fmtMoney, monthOptions } from '../utils/format'
@@ -152,9 +154,9 @@ export default function Entries() {
 
         <div className="masthead-figure">
           {current.kind === 'debt' ? (
-            <Money value={current.totals.balance} signed={false} direction="out" />
+            <Money value={current.totals.balance} signed={false} direction="out" display />
           ) : (
-            <Money value={totals?.balance ?? 0} />
+            <Money value={totals?.balance ?? 0} display />
           )}
         </div>
 
@@ -223,11 +225,12 @@ export default function Entries() {
 
         <button
           type="button"
-          className="btn btn-sm filter-toggle"
+          className={`btn btn-sm filter-toggle${activeFilterCount ? ' has-filters' : ''}`}
           onClick={() => setFiltersOpen((o) => !o)}
           aria-expanded={filtersOpen}
           aria-controls="entry-filters"
         >
+          <Icon name="filter" size={15} />
           ตัวกรอง{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
         </button>
 
@@ -235,7 +238,8 @@ export default function Entries() {
 
         {canEdit && (
           <Link className="btn btn-primary btn-sm" to="/new">
-            + เพิ่มรายการ
+            <Icon name="plus" size={16} />
+            เพิ่มรายการ
           </Link>
         )}
       </div>
@@ -313,7 +317,14 @@ export default function Entries() {
           <EntryList entries={items} />
         ))}
 
-      {loading && <p className="t-dim" style={{ textAlign: 'center' }}>กำลังโหลด...</p>}
+      {/* Only on the first page. Appending a second page keeps the rows above
+          in place, so a skeleton underneath them would be noise. */}
+      {loading && items.length === 0 && <SkeletonRows rows={7} />}
+      {loading && items.length > 0 && (
+        <p className="t-faint" style={{ textAlign: 'center', margin: 0 }}>
+          กำลังโหลด...
+        </p>
+      )}
 
       {hasMore && !loading && (
         <button
@@ -321,6 +332,7 @@ export default function Entries() {
           className="btn btn-block"
           onClick={() => setQuery((prev) => ({ ...prev, offset: prev.offset + PAGE_SIZE }))}
         >
+          <Icon name="chevronDown" size={16} />
           โหลดเพิ่ม ({items.length}/{page.total})
         </button>
       )}

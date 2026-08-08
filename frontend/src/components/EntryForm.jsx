@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 
+import Icon from './Icon'
 import { apiSlipUrl, apiSuggestCategory, apiUploadSlip } from '../api/client'
 import { useLedgers } from '../data/LedgerContext'
 import { nowLocalInputValue, toLocalInputValue } from '../utils/format'
@@ -328,7 +329,7 @@ export default function EntryForm({
               onChange={handleFile}
               hidden
             />
-            <span aria-hidden="true" style={{ fontSize: '1.5rem' }}>📸</span>
+            <Icon name="camera" size={26} />
             <span>{uploading ? 'กำลังอัปโหลด...' : 'ถ่ายรูป / เลือกสลิป'}</span>
           </label>
         )}

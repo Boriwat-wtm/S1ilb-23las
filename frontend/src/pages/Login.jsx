@@ -1,5 +1,6 @@
 import { useState } from 'react'
 
+import Icon from '../components/Icon'
 import ThemePicker from '../components/ThemePicker'
 import { useAuth } from '../auth/AuthContext'
 
@@ -126,7 +127,8 @@ export default function Login() {
           onClick={() => setThemeOpen(true)}
           aria-haspopup="dialog"
         >
-          ◑ เปลี่ยนธีมสี
+          <Icon name="contrast" size={16} />
+          เปลี่ยนธีมสี
         </button>
       </form>
 

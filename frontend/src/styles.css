@@ -38,11 +38,20 @@
   --s7: 48px;
 
   /* --- geometry: mostly square. Ledgers do not have rounded corners. --- */
-  --r-control: 4px;
-  --r-surface: 8px;
+  --r-control: 5px;
+  --r-surface: 10px;
+  --r-sheet: 16px;
   --rail-w: 264px;
   --tabbar-h: 58px;
   --measure: 1120px;
+
+  /* --- motion ---
+     Short enough to feel like response rather than animation. The slower one
+     is only for a sheet travelling the height of the screen; anything that
+     merely changes colour uses --dur-1. */
+  --dur-1: 110ms;
+  --dur-2: 180ms;
+  --ease: cubic-bezier(0.32, 0.72, 0.28, 1);
 }
 
 /* ==========================================================================
@@ -96,6 +105,12 @@
 
   --focus: #1f5d4d;
 
+  /* Depth is spent in exactly two places — the sheet and the sticky topbar —
+     because those are the only two surfaces that genuinely float above the
+     page. Everywhere else uses a rule. */
+  --shadow-sheet: 0 -8px 40px rgba(24, 20, 12, 0.16);
+  --shadow-bar: 0 1px 0 rgba(24, 20, 12, 0.04);
+
   color-scheme: light;
 }
 
@@ -132,6 +147,9 @@
 
   --focus: #1c3f66;
 
+  --shadow-sheet: 0 -8px 40px rgba(10, 18, 30, 0.18);
+  --shadow-bar: 0 1px 0 rgba(10, 18, 30, 0.05);
+
   color-scheme: light;
 }
 
@@ -165,6 +183,9 @@
 
   --focus: #c9a227;
 
+  --shadow-sheet: 0 -8px 48px rgba(0, 0, 0, 0.55);
+  --shadow-bar: 0 1px 0 rgba(255, 255, 255, 0.04);
+
   color-scheme: dark;
 }
 
@@ -197,6 +218,9 @@
   --danger-soft: #2d1719;
 
   --focus: #7aa7e0;
+
+  --shadow-sheet: 0 -8px 48px rgba(0, 0, 0, 0.55);
+  --shadow-bar: 0 1px 0 rgba(255, 255, 255, 0.04);
 
   color-scheme: dark;
 }
@@ -232,6 +256,9 @@
     --danger-soft: #2e1614;
 
     --focus: #c9a227;
+
+    --shadow-sheet: 0 -8px 48px rgba(0, 0, 0, 0.55);
+    --shadow-bar: 0 1px 0 rgba(255, 255, 255, 0.04);
 
     color-scheme: dark;
   }
@@ -295,25 +322,86 @@ a {
 :focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
-  border-radius: 2px;
+  border-radius: 3px;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+
+/* --------------------------------------------------------------- icons ---
+   Stroke icons inherit colour and sit on the text baseline. The vertical
+   nudge is an optical correction: a 24px box centred on a 16px line always
+   reads a hair low next to Thai, which carries more weight below the
+   baseline than Latin does. */
+.icon {
+  flex: none;
+  vertical-align: -0.18em;
+}
+
+/* A category emoji next to stroke icons needs its box normalised, or the
+   rows it appears in will not align with the rows it does not. */
+.glyph-emoji {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex: none;
+  font-size: 16px;
+  line-height: 1;
+}
+
+/* -------------------------------------------------------------- scrollbars
+   Only inside the two panes that actually scroll independently. A styled
+   scrollbar on the page body reads as a theme trying too hard. */
+.table-scroll,
+.rail {
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule-strong) transparent;
+}
+
+.table-scroll::-webkit-scrollbar,
+.rail::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.table-scroll::-webkit-scrollbar-thumb,
+.rail::-webkit-scrollbar-thumb {
+  background: var(--rule-strong);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 99px;
+}
+
+.table-scroll::-webkit-scrollbar-track,
+.rail::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 /* --------------------------------------------------------------- type roles */
+/* Tracking scales inversely with size: large type needs to be pulled in or it
+   reads loose, small type needs air or it reads clotted. Setting it once per
+   role is the difference between a type scale and a list of font sizes. */
 .t-display {
   font-size: clamp(1.9rem, 7vw, 2.6rem);
   font-weight: 680;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.022em;
 }
 
 .t-heading {
   font-size: 1.02rem;
   font-weight: 650;
+  letter-spacing: -0.006em;
 }
 
 /* Section labels. No uppercase — see note 3. Hierarchy from size + colour. */
 .t-label {
   font-size: 0.74rem;
   font-weight: 600;
+  letter-spacing: 0.012em;
   color: var(--ink-3);
 }
 
@@ -378,6 +466,7 @@ a {
   z-index: 30;
   background: var(--surface);
   border-bottom: 1px solid var(--rule);
+  box-shadow: var(--shadow-bar);
   padding-top: env(safe-area-inset-top);
 }
 
@@ -422,7 +511,7 @@ a {
   align-items: center;
   gap: var(--s2);
   min-width: 0;
-  padding: var(--s1) var(--s2);
+  padding: 5px var(--s2);
   margin-left: calc(var(--s2) * -1);
   border: 1px solid transparent;
   border-radius: var(--r-control);
@@ -431,11 +520,26 @@ a {
   font: inherit;
   cursor: pointer;
   text-align: left;
+  transition: background-color var(--dur-1) var(--ease),
+    border-color var(--dur-1) var(--ease);
 }
 
 .ledger-chip:hover {
   border-color: var(--rule);
   background: var(--surface-sunk);
+}
+
+.ledger-chip:active {
+  background: var(--rule);
+}
+
+.ledger-chip-caret {
+  color: var(--ink-3);
+  transition: transform var(--dur-1) var(--ease);
+}
+
+.ledger-chip[aria-expanded='true'] .ledger-chip-caret {
+  transform: rotate(180deg);
 }
 
 .ledger-chip-name {
@@ -445,25 +549,23 @@ a {
   text-overflow: ellipsis;
 }
 
-.ledger-chip-caret {
-  color: var(--ink-3);
-  font-size: 0.7rem;
-  flex: none;
-}
-
 /* Privacy made visible: a lock or a headcount, never nothing. */
 .share-badge {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
   flex: none;
   font-size: 0.72rem;
   color: var(--ink-2);
   border: 1px solid var(--rule);
   border-radius: 99px;
-  padding: 0 var(--s2);
-  line-height: 1.7;
+  padding: 1px var(--s2) 1px 6px;
+  line-height: 1.55;
   white-space: nowrap;
+}
+
+.share-badge .icon {
+  vertical-align: 0;
 }
 
 .share-badge.is-shared {
@@ -489,23 +591,34 @@ a {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
+  gap: 3px;
   height: var(--tabbar-h);
   font-size: 0.68rem;
-  color: var(--ink-2);
+  color: var(--ink-3);
   border-top: 2px solid transparent;
   margin-top: -1px;
+  transition: color var(--dur-1) var(--ease);
 }
 
-.tab-glyph {
-  font-size: 1.05rem;
-  line-height: 1;
+.tab .icon {
+  vertical-align: 0;
+  transition: transform var(--dur-1) var(--ease);
+}
+
+.tab:active .icon {
+  transform: scale(0.9);
 }
 
 .tab.active {
   color: var(--accent);
   border-top-color: var(--accent);
   font-weight: 600;
+}
+
+/* The active tab's icon carries a touch more weight, so the state survives
+   being read at arm's length where the 2px rule above it does not. */
+.tab.active .icon {
+  stroke-width: 2.1;
 }
 
 /* ======================================================= desktop rail == */
@@ -616,15 +729,27 @@ a {
   margin-top: auto;
 }
 
-.rail-nav a,
+.rail-nav-item,
 .rail-nav-btn {
-  padding: var(--s2) var(--s3);
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding: 9px var(--s3);
   border-radius: var(--r-control);
   color: var(--ink-2);
   font-size: 0.9rem;
+  transition: background-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+
+.rail-nav-item .icon,
+.rail-nav-btn .icon {
+  vertical-align: 0;
+  color: var(--ink-3);
+  transition: color var(--dur-1) var(--ease);
 }
 
 .rail-nav-btn {
+  width: 100%;
   font-family: inherit;
   text-align: left;
   background: none;
@@ -632,16 +757,26 @@ a {
   cursor: pointer;
 }
 
-.rail-nav a:hover,
+.rail-nav-item:hover,
 .rail-nav-btn:hover {
   background: var(--surface-sunk);
   color: var(--ink);
 }
 
-.rail-nav a.active {
+.rail-nav-item:hover .icon,
+.rail-nav-btn:hover .icon {
+  color: var(--ink-2);
+}
+
+.rail-nav-item.active {
   color: var(--ink);
   font-weight: 600;
   background: var(--surface-sunk);
+}
+
+.rail-nav-item.active .icon {
+  color: var(--accent);
+  stroke-width: 2;
 }
 
 /* ========================================================== page blocks */
@@ -746,6 +881,15 @@ a {
   color: var(--ink-3);
 }
 
+/* Only used at masthead size — see the note in Money.jsx for why it must not
+   leak into the table. */
+.amount-satang {
+  font-size: 0.58em;
+  font-weight: 600;
+  opacity: 0.62;
+  margin-left: 0.06em;
+}
+
 /* =============================================== entry table =========== */
 .table-scroll {
   overflow-x: auto;
@@ -848,20 +992,28 @@ table.ledger .running {
 
 .entry-row {
   display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: baseline;
+  grid-template-columns: 22px 1fr auto;
+  align-items: center;
   gap: var(--s3);
-  padding: var(--s3) var(--s1);
+  padding: 11px var(--s2) 11px var(--s1);
   border-bottom: 1px solid var(--rule);
+  border-radius: var(--r-control);
+  transition: background-color var(--dur-1) var(--ease);
 }
 
 .entry-row:hover {
   background: var(--surface);
 }
 
+.entry-row:active {
+  background: var(--surface-sunk);
+}
+
 .entry-glyph {
-  font-size: 1rem;
-  line-height: 1.4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-3);
 }
 
 .entry-main {
@@ -869,10 +1021,18 @@ table.ledger .running {
 }
 
 .entry-desc {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   font-weight: 550;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.entry-clip {
+  color: var(--ink-3);
+  vertical-align: 0;
 }
 
 .entry-meta {
@@ -932,6 +1092,10 @@ textarea::placeholder {
 }
 
 .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
   font: inherit;
   font-size: 0.92rem;
   font-weight: 600;
@@ -943,15 +1107,37 @@ textarea::placeholder {
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   white-space: nowrap;
+  transition: background-color var(--dur-1) var(--ease),
+    border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease),
+    opacity var(--dur-1) var(--ease), transform var(--dur-1) var(--ease);
+}
+
+.btn .icon {
+  vertical-align: 0;
 }
 
 .btn:hover {
   background: var(--surface-sunk);
 }
 
+/* Scale, not translate. A 1px nudge shifts the button relative to everything
+   beside it and reads as a layout twitch; 0.98 reads as taking the press. */
+.btn:active {
+  transform: scale(0.98);
+}
+
 .btn:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: default;
+  transform: none;
+}
+
+/* Square target for icon-only buttons, so the topbar keeps an even rhythm. */
+.btn-icon {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  flex: none;
 }
 
 /* Ink, not a brand hue — see note 4 at the top of this file. */
@@ -1066,6 +1252,12 @@ textarea::placeholder {
    hold at every width. */
 .filter-toggle {
   display: none;
+}
+
+.filter-toggle.has-filters {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 @media (max-width: 719px) {
@@ -1207,11 +1399,12 @@ textarea::placeholder {
 }
 
 .link-glyph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 26px;
   flex: none;
-  text-align: center;
-  font-size: 1.05rem;
-  color: var(--ink-2);
+  color: var(--ink-3);
 }
 
 .link-title {
@@ -1222,6 +1415,12 @@ textarea::placeholder {
 .link-caret {
   color: var(--ink-3);
   flex: none;
+  vertical-align: 0;
+  transition: transform var(--dur-1) var(--ease);
+}
+
+.link-list > li > a:hover .link-caret {
+  transform: translateX(2px);
 }
 
 .static-field {
@@ -1277,7 +1476,7 @@ textarea::placeholder {
 
 .theme-option {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr 20px;
   align-items: center;
   gap: var(--s3);
   width: 100%;
@@ -1289,6 +1488,8 @@ textarea::placeholder {
   border: 1px solid transparent;
   border-radius: var(--r-control);
   cursor: pointer;
+  transition: background-color var(--dur-1) var(--ease),
+    border-color var(--dur-1) var(--ease);
 }
 
 .theme-option:hover {
@@ -1327,31 +1528,141 @@ textarea::placeholder {
 }
 
 .theme-check {
+  display: flex;
+  justify-content: flex-end;
   color: var(--accent);
-  font-weight: 700;
+}
+
+/* --------------------------------------------------------------- skeletons
+   A row-shaped placeholder rather than the word "loading". On a cold Render
+   the wait is real, and showing the shape of what is coming makes the page
+   feel like it is arriving instead of stalled. */
+.skeleton {
+  border-radius: var(--r-control);
+  background: linear-gradient(
+    90deg,
+    var(--surface-sunk) 25%,
+    var(--rule) 50%,
+    var(--surface-sunk) 75%
+  );
+  background-size: 300% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 150% 0;
+  }
+  to {
+    background-position: -150% 0;
+  }
+}
+
+.skeleton-rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.skeleton-row {
+  display: grid;
+  grid-template-columns: 20px 1fr auto;
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s3) var(--s1);
+  border-bottom: 1px solid var(--rule);
+}
+
+.skeleton-row .skeleton:nth-child(1) {
+  height: 18px;
+  border-radius: 4px;
+}
+
+.skeleton-line {
+  height: 11px;
+}
+
+.skeleton-line + .skeleton-line {
+  margin-top: 6px;
+  height: 9px;
+}
+
+.skeleton-amount {
+  width: 68px;
+  height: 15px;
 }
 
 .sheet-backdrop {
   position: fixed;
   inset: 0;
   z-index: 60;
-  background: rgba(0, 0, 0, 0.45);
+  background: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: flex-end;
+  animation: fade-in var(--dur-2) var(--ease);
+}
+
+.sheet-backdrop.closing {
+  animation: fade-in var(--dur-2) var(--ease) reverse forwards;
 }
 
 .sheet {
   width: 100%;
-  max-height: 82dvh;
+  max-height: 84dvh;
   overflow-y: auto;
   background: var(--surface);
-  border-top-left-radius: var(--r-surface);
-  border-top-right-radius: var(--r-surface);
+  border-top-left-radius: var(--r-sheet);
+  border-top-right-radius: var(--r-sheet);
   border-top: 1px solid var(--rule-strong);
-  padding: var(--s4) var(--s4) calc(var(--s4) + env(safe-area-inset-bottom));
+  box-shadow: var(--shadow-sheet);
+  padding: var(--s2) var(--s4) calc(var(--s4) + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
   gap: var(--s3);
+  animation: sheet-up var(--dur-2) var(--ease);
+}
+
+.sheet.closing {
+  animation: sheet-up var(--dur-2) var(--ease) reverse forwards;
+}
+
+/* The grab handle is not decoration — it is the only affordance that says a
+   bottom sheet is dismissible by dragging, which is what a thumb will try. */
+.sheet-grip {
+  width: 34px;
+  height: 4px;
+  flex: none;
+  margin: 0 auto var(--s1);
+  border-radius: 99px;
+  background: var(--rule-strong);
+}
+
+.sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+  padding-bottom: var(--s2);
+  border-bottom: 1px solid var(--rule);
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(14px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 @media (min-width: 640px) {
@@ -1365,6 +1676,11 @@ textarea::placeholder {
     max-width: 440px;
     border-radius: var(--r-surface);
     border: 1px solid var(--rule-strong);
+  }
+
+  /* A centred dialog is not draggable, so the handle would be a lie. */
+  .sheet-grip {
+    display: none;
   }
 }
 

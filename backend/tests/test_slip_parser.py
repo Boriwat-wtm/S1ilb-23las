@@ -137,6 +137,51 @@ check("does not return the bank's own furniture",
       parse_payee("โอนเงินสำเร็จ\nจำนวนเงิน 45.00 บาท") is None)
 check("no payee line -> None", parse_payee(UNLABELLED) is None)
 
+print("\n== one parser, seven banks ==")
+# The claim this section defends: no per-bank schema. Banks differ in
+# *vocabulary*, not in where things sit, so a label-anchored parser covers
+# them all and a new bank is a word added to a list, not a template.
+BANKS = {
+    "K PLUS": ("โอนเงินสำเร็จ\n08 ส.ค. 68 14:23\nไปยัง บริษัท ซีพี ออลล์\n"
+               "จำนวนเงิน 45.00 บาท", "45.00", "บริษัท ซีพี ออลล์"),
+    "SCB EASY": ("รายการสำเร็จ\n8 สิงหาคม 2568 09:05\nไปยัง ฝน สายบัว\n"
+                 "จำนวน 1,250.75 บาท", "1250.75", "ฝน สายบัว"),
+    "BBL": ("08/08/2568 20:15\nถึง ร้านกาแฟดอยช้าง\nยอดเงิน 89.50 THB",
+            "89.50", "ร้านกาแฟดอยช้าง"),
+    "KTB": ("โอนเงินสำเร็จ\n08 ส.ค. 2568 11:30\nผู้รับเงิน สมชาย ใจดี\n"
+            "จำนวนเงิน 320.00 บาท", "320.00", "สมชาย ใจดี"),
+    "TTB": ("8 ส.ค. 68 16:45\nบัญชีปลายทาง นางสาว ฝน ส\nจำนวนเงิน 1,000.00 บาท",
+            "1000.00", "นางสาว ฝน ส"),
+    "GSB": ("สลิปโอนเงิน\n08-08-2568 08:12\nไปที่ การไฟฟ้านครหลวง\n฿2,340.00",
+            "2340.00", "การไฟฟ้านครหลวง"),
+    "English UI": ("Transfer Successful\n2025-08-08 19:04\nTo: Grab Thailand\n"
+                   "Total 189.00 THB", "189.00", "Grab Thailand"),
+}
+for bank, (text, want_amount, want_payee) in BANKS.items():
+    r = parse_slip_text(text)
+    check(f"{bank}: amount", r["amount"] == Decimal(want_amount), r["amount"])
+    check(f"{bank}: date", r["occurred_at"] is not None, r["occurred_at"])
+    check(f"{bank}: payee", r["description"] == want_payee, repr(r["description"]))
+
+print("\n== payee labels that used to be wrong ==")
+# "ผู้รับ" tried before "ผู้รับเงิน" left "เงิน" glued to the name.
+check("ผู้รับเงิน does not leak เงิน into the name",
+      parse_payee("ผู้รับเงิน สมชาย ใจดี") == "สมชาย ใจดี",
+      parse_payee("ผู้รับเงิน สมชาย ใจดี"))
+check("ผู้รับโอน likewise",
+      parse_payee("ผู้รับโอน ร้านข้าวมันไก่") == "ร้านข้าวมันไก่",
+      parse_payee("ผู้รับโอน ร้านข้าวมันไก่"))
+check("บัญชีปลายทาง is recognised",
+      parse_payee("บัญชีปลายทาง นางสาว ฝน ส") == "นางสาว ฝน ส",
+      parse_payee("บัญชีปลายทาง นางสาว ฝน ส"))
+# An unanchored bare "to" matched inside these and returned the line's tail.
+check("'Total' is not a payee line", parse_payee("Total 189.00 THB") is None,
+      parse_payee("Total 189.00 THB"))
+check("'Autopay' is not a payee line", parse_payee("Autopay 500.00") is None,
+      parse_payee("Autopay 500.00"))
+check("but a real English To: line still works",
+      parse_payee("To: Grab Thailand") == "Grab Thailand")
+
 print("\n== reference ==")
 check("รหัสอ้างอิง", parse_reference(KBANK) == "015082568142312345", parse_reference(KBANK))
 check("เลขที่รายการ", parse_reference(SCB) == "20250808SCB0099123", parse_reference(SCB))

@@ -66,8 +66,32 @@ _DATE_THAI = re.compile(rf"\b(\d{{1,2}})\s*({_MONTH_ALT})\s*(\d{{2}}|\d{{4}})\b"
 _DATE_NUMERIC = re.compile(r"\b(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2}|\d{4})\b")
 _DATE_ISO = re.compile(r"\b(\d{4})-(\d{2})-(\d{2})\b")
 
-_PAYEE = re.compile(
-    r"(?:ไปยัง|ไปที่|ถึง|ผู้รับ|to)\s*[:：]?\s*(.+)", re.IGNORECASE
+# Where the banks actually differ is vocabulary, not layout — so the payee
+# label is a list to extend, never a per-bank template.
+#
+# Sorted longest-first, which is load-bearing: with "ผู้รับ" tried before
+# "ผู้รับเงิน", the shorter one wins and leaves "เงิน" glued to the front of
+# the captured name.
+_PAYEE_LABELS = (
+    "บัญชีปลายทาง",
+    "ผู้รับเงิน",
+    "ผู้รับโอน",
+    "ผู้รับ",
+    "โอนไปยัง",
+    "ไปยัง",
+    "ไปที่",
+    "ถึง",
+)
+_PAYEE_ALT = "|".join(
+    re.escape(label) for label in sorted(_PAYEE_LABELS, key=len, reverse=True)
+)
+_PAYEE = re.compile(rf"(?:{_PAYEE_ALT})\s*[:：]?\s*(.+)")
+
+# English labels need anchoring and a word boundary. An unanchored bare "to"
+# matches inside "Total 189.00" and "Autopay 500.00" and returns the tail of
+# the line as somebody's name.
+_PAYEE_EN = re.compile(
+    r"^\s*(?:to|payee|recipient|transfer\s+to)\b\s*[:：]?\s*(.+)", re.IGNORECASE
 )
 _REF = re.compile(
     r"(?:รหัสอ้างอิง|เลขที่รายการ|หมายเลขอ้างอิง|reference|ref\.?\s*no\.?|ref)\s*[:：]?\s*"
@@ -155,8 +179,9 @@ def parse_datetime(text: str) -> datetime | None:
 
 
 def parse_payee(text: str) -> str | None:
-    for line in text.splitlines():
-        match = _PAYEE.search(line.strip())
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        match = _PAYEE.search(line) or _PAYEE_EN.match(line)
         if not match:
             continue
         name = match.group(1).strip(" -:•\t")

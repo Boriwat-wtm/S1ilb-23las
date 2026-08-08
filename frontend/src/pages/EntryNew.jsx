@@ -47,13 +47,15 @@ export default function EntryNew() {
   }
 
   return (
-    <div className="page">
-      <div className="page-head">
-        <h1 className="t-display" style={{ fontSize: '1.5rem' }}>เพิ่ม{words.entry}</h1>
-        <span className="t-meta">
+    <div className="page page-narrow">
+      {/* Title and destination stack, rather than sitting at opposite ends of
+          a 1120px bar with nothing between them. */}
+      <header>
+        <h1 className="page-title">เพิ่ม{words.entry}</h1>
+        <p className="small-print">
           ลงใน {current.emoji} {current.name}
-        </span>
-      </div>
+        </p>
+      </header>
       <EntryForm mode="create" onSubmit={submit} busy={busy} error={error} />
     </div>
   )

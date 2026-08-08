@@ -11,41 +11,43 @@ const STORAGE_KEY = 'bank.theme'
  * browser chrome colour on mobile, which cannot read a CSS variable. It is the
  * only place a colour is repeated, and it is the theme's --paper value.
  */
+/**
+ * Three, not four, and named for what they are rather than for minerals.
+ *
+ * The previous set — Ivory, Porcelain, Obsidian, Midnight — was four English
+ * mineral names over four hue-rotations of the same palette, including
+ * black-and-brass and navy-and-sky-blue, which are the two most generated
+ * "premium" themes in existence. Each of these three is instead sampled from
+ * something the app is actually about, and says so.
+ */
 export const THEMES = [
   {
     id: 'auto',
     name: 'ตามระบบ',
     hint: 'สลับสว่าง/มืดตามเครื่อง',
-    swatch: ['#f8f6f1', '#0b0b0c', '#166b4a', '#c9a227'],
-    paper: { light: '#f8f6f1', dark: '#0b0b0c' },
+    swatch: ['#f2efe4', '#121110', '#245e46', '#8f3325'],
+    paper: { light: '#f2efe4', dark: '#121110' },
   },
   {
-    id: 'ivory',
-    name: 'Ivory',
-    hint: 'กระดาษอุ่น หมึกดำ เขียวสน',
-    swatch: ['#f8f6f1', '#191712', '#166b4a', '#a03c1f'],
-    paper: '#f8f6f1',
+    id: 'paper',
+    name: 'กระดาษ',
+    hint: 'สีสมุดบัญชีธนาคาร หมึกดำอุ่น แดงถอนเงิน',
+    swatch: ['#f2efe4', '#1c1a13', '#245e46', '#8f3325'],
+    paper: '#f2efe4',
   },
   {
-    id: 'porcelain',
-    name: 'Porcelain',
-    hint: 'ขาวเย็น น้ำเงินเข้ม',
-    swatch: ['#f5f7f9', '#12253b', '#0f6553', '#9e3229'],
-    paper: '#f5f7f9',
+    id: 'mono',
+    name: 'ขาวดำ',
+    hint: 'สีกระดาษสลิป มีสีเฉพาะตรงตัวเงิน',
+    swatch: ['#ecebe8', '#131312', '#1d5f47', '#963224'],
+    paper: '#ecebe8',
   },
   {
-    id: 'obsidian',
-    name: 'Obsidian',
-    hint: 'ดำสนิท ทองเหลือง',
-    swatch: ['#0b0b0c', '#f2efe8', '#54c295', '#c9a227'],
-    paper: '#0b0b0c',
-  },
-  {
-    id: 'midnight',
-    name: 'Midnight',
-    hint: 'น้ำเงินลึก เงินเย็น',
-    swatch: ['#080d16', '#e9eef7', '#4ec9a4', '#7aa7e0'],
-    paper: '#080d16',
+    id: 'night',
+    name: 'กลางคืน',
+    hint: 'ดำอมน้ำตาล ไม่ใช่น้ำเงิน',
+    swatch: ['#121110', '#ebe8e1', '#6cbe95', '#d9866e'],
+    paper: '#121110',
   },
 ]
 

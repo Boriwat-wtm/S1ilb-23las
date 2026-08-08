@@ -75,11 +75,11 @@ export default function EntryEdit() {
     }
   }
 
-  if (loading) return <div className="page"><p className="t-dim">กำลังโหลด...</p></div>
+  if (loading) return <div className="page page-narrow"><p className="t-dim">กำลังโหลด...</p></div>
 
   if (!entry) {
     return (
-      <div className="page">
+      <div className="page page-narrow">
         <p className="notice notice-error">{error || 'ไม่พบรายการนี้'}</p>
         <Link className="btn" to="/">กลับหน้ารายการ</Link>
       </div>
@@ -87,9 +87,9 @@ export default function EntryEdit() {
   }
 
   return (
-    <div className="page">
+    <div className="page page-narrow">
       <div className="page-head">
-        <h1 className="t-display" style={{ fontSize: '1.5rem' }}>
+        <h1 className="page-title">
           {canEdit ? 'แก้ไขรายการ' : 'รายละเอียดรายการ'}
         </h1>
         <span className="t-meta">

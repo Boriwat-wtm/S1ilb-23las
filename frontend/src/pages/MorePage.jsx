@@ -44,9 +44,9 @@ export default function MorePage() {
   const { user, logout } = useAuth()
 
   return (
-    <div className="page">
+    <div className="page page-narrow">
       <div className="page-head">
-        <h1 className="t-display" style={{ fontSize: '1.5rem' }}>เพิ่มเติม</h1>
+        <h1 className="page-title">เพิ่มเติม</h1>
       </div>
 
       {current && (

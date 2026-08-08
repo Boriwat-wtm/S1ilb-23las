@@ -40,9 +40,9 @@ export default function LedgerNew() {
   }
 
   return (
-    <div className="page">
+    <div className="page page-narrow">
       <div className="page-head">
-        <h1 className="t-display" style={{ fontSize: '1.5rem' }}>สร้างสมุดใหม่</h1>
+        <h1 className="page-title">สร้างสมุดใหม่</h1>
       </div>
 
       <form className="panel" onSubmit={submit}>

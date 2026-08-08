@@ -14,9 +14,9 @@ export default defineConfig({
         description: 'บันทึกรายจ่ายร่วมกันสองคน',
         lang: 'th',
         // The install prompt and splash screen cannot read the runtime theme,
-        // so these are Ivory's paper and ink — the default light theme.
-        theme_color: '#f8f6f1',
-        background_color: '#f8f6f1',
+        // so these are กระดาษ's paper — the default light theme.
+        theme_color: '#f2efe4',
+        background_color: '#f2efe4',
         display: 'standalone',
         orientation: 'portrait',
         start_url: '/',

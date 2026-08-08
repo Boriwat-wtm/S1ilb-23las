@@ -237,16 +237,20 @@ export default function EntryForm({
       </fieldset>
 
       <label className="field">
-        <span>จำนวนเงิน (บาท)</span>
-        <input
-          type="text"
-          inputMode="decimal"
-          value={amount}
-          onChange={onAmountChange}
-          placeholder="0.00"
-          className="input-amount"
-          required
-        />
+        <span>จำนวนเงิน</span>
+        <span className="amount-box">
+          <span className="baht" aria-hidden="true">฿</span>
+          <input
+            type="text"
+            inputMode="decimal"
+            value={amount}
+            onChange={onAmountChange}
+            placeholder="0.00"
+            className="input-amount"
+            aria-label="จำนวนเงิน (บาท)"
+            required
+          />
+        </span>
       </label>
 
       <label className="field">
@@ -329,8 +333,11 @@ export default function EntryForm({
               onChange={handleFile}
               hidden
             />
-            <Icon name="camera" size={26} />
-            <span>{uploading ? 'กำลังอัปโหลด...' : 'ถ่ายรูป / เลือกสลิป'}</span>
+            <Icon name="camera" size={20} />
+            <span className="grow">
+              {uploading ? 'กำลังอัปโหลด...' : 'ถ่ายรูป หรือเลือกสลิปจากเครื่อง'}
+            </span>
+            <Icon name="chevronRight" size={16} className="link-caret" />
           </label>
         )}
 

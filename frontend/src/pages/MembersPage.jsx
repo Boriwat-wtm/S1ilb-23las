@@ -92,9 +92,9 @@ export default function MembersPage() {
   }
 
   return (
-    <div className="page">
+    <div className="page page-narrow">
       <div className="page-head">
-        <h1 className="t-display" style={{ fontSize: '1.5rem' }}>สมาชิก</h1>
+        <h1 className="page-title">สมาชิก</h1>
         <span className="t-meta">
           {current.emoji} {current.name}
         </span>

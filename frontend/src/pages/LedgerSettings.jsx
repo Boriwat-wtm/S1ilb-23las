@@ -78,9 +78,9 @@ export default function LedgerSettings() {
   }
 
   return (
-    <div className="page">
+    <div className="page page-narrow">
       <div className="page-head">
-        <h1 className="t-display" style={{ fontSize: '1.5rem' }}>ตั้งค่าสมุด</h1>
+        <h1 className="page-title">ตั้งค่าสมุด</h1>
         <span className="t-meta">
           สร้างเมื่อ {fmtDateShort(current.created_at)} · เจ้าของ {current.owner.display_name}
         </span>

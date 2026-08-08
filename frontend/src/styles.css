@@ -59,7 +59,7 @@
 
    Applied as [data-theme] on <html> by ThemeContext. "auto" carries no
    attribute value of its own — it simply lets the media query below swap
-   Ivory for Obsidian.
+   กระดาษ for กลางคืน.
 
    Every palette holds the same contract:
      paper < surface-sunk < surface   surfaces, back to front
@@ -70,195 +70,168 @@
      credit / debit                   direction of money; see note 2
 
    ink-3 is the constraint that sets the floor everywhere: it is the smallest,
-   faintest text in the app, so each theme's value is chosen to clear ~4.5:1
-   against its own paper rather than being picked to look pretty in isolation.
+   faintest text in the app, so each theme's value is chosen to clear 4.5:1
+   against its own background rather than picked to look pretty in isolation.
+   In a light theme --paper binds; in a dark one --surface does, because the
+   card sits lighter than the page. scripts/check-contrast.mjs tests both.
    ========================================================================== */
 
-/* --- Ivory: warm paper, deep pine. The default light theme. --- */
+/* --- กระดาษ (paper). The default light theme.
+   Sampled from a Thai bank passbook: oat page, warm near-black printing,
+   and the dull red the machine stamps a withdrawal in. Not a neutral grey
+   nudged warm — the page is genuinely tinted, the way paper is. --- */
 :root,
-[data-theme='ivory'] {
-  --paper: #f8f6f1;
-  --surface: #ffffff;
-  --surface-sunk: #f0ede5;
-  --rule: #e4dfd3;
-  --rule-strong: #c6bfad;
-  --ink: #191712;
-  --ink-2: #565046;
-  --ink-3: #776f61;
+[data-theme='paper'] {
+  --paper: #f2efe4;
+  --surface: #fbf9f2;
+  --surface-sunk: #e8e4d5;
+  --rule: #dcd6c3;
+  --rule-strong: #bbb49c;
+  --ink: #1c1a13;
+  --ink-2: #565042;
+  --ink-3: #6f6854;
 
-  --accent: #1f5d4d;
+  --accent: #2b5347;
   --accent-ink: #ffffff;
-  --accent-soft: #e3ede9;
+  --accent-soft: #e0e8e2;
 
-  --btn-bg: #191712;
-  --btn-ink: #f8f6f1;
+  --btn-bg: #1c1a13;
+  --btn-ink: #f2efe4;
 
-  --credit: #166b4a;
-  --debit: #a03c1f;
-  --credit-soft: #e2efe8;
-  --debit-soft: #f8e8e1;
+  --credit: #245e46;
+  --debit: #8f3325;
+  --credit-soft: #e1eae2;
+  --debit-soft: #f4e5df;
 
-  --warn: #7d5209;
-  --warn-soft: #fbf2dd;
-  --danger: #9d241a;
-  --danger-soft: #fbe9e6;
+  --warn: #6f4a0a;
+  --warn-soft: #f6edd6;
+  --danger: #8f3325;
+  --danger-soft: #f4e5df;
 
-  --focus: #1f5d4d;
+  --focus: #2b5347;
 
   /* Depth is spent in exactly two places — the sheet and the sticky topbar —
      because those are the only two surfaces that genuinely float above the
      page. Everywhere else uses a rule. */
-  --shadow-sheet: 0 -8px 40px rgba(24, 20, 12, 0.16);
-  --shadow-bar: 0 1px 0 rgba(24, 20, 12, 0.04);
+  --shadow-sheet: 0 -8px 40px rgba(28, 26, 19, 0.18);
+  --shadow-bar: 0 1px 0 rgba(28, 26, 19, 0.05);
 
   color-scheme: light;
 }
 
-/* --- Porcelain: cool white, deep navy. --- */
-[data-theme='porcelain'] {
-  --paper: #f5f7f9;
+/* --- ขาวดำ (mono).
+   Thermal receipt paper. The chrome is greyscale on purpose, so the only
+   colour anywhere on the screen is money moving. Nothing competes with the
+   figures — which is the whole argument of the app, taken literally. --- */
+[data-theme='mono'] {
+  --paper: #ecebe8;
   --surface: #ffffff;
-  --surface-sunk: #eaeef3;
-  --rule: #dee4eb;
-  --rule-strong: #bcc5d1;
-  --ink: #0f151d;
-  --ink-2: #495463;
-  /* Darkened from #6b7889, which measured 4.18:1 on this theme's paper.
-     Porcelain's paper is the lightest of the four, so its faint text has the
-     least room and is the value that has to be checked, not eyeballed. */
-  --ink-3: #626d7d;
+  --surface-sunk: #e1e0dc;
+  --rule: #d3d2ce;
+  --rule-strong: #aeada8;
+  --ink: #131312;
+  --ink-2: #4b4a48;
+  --ink-3: #676663;
 
-  --accent: #1c3f66;
+  --accent: #232322;
   --accent-ink: #ffffff;
-  --accent-soft: #e3eaf3;
+  --accent-soft: #dcdbd7;
 
-  --btn-bg: #12253b;
-  --btn-ink: #f5f7f9;
+  --btn-bg: #131312;
+  --btn-ink: #ecebe8;
 
-  --credit: #0f6553;
-  --debit: #9e3229;
-  --credit-soft: #e0efeb;
-  --debit-soft: #f8e7e5;
+  --credit: #1d5f47;
+  --debit: #963224;
+  --credit-soft: #dfe7e2;
+  --debit-soft: #f0e2de;
 
-  --warn: #7a5410;
-  --warn-soft: #fbf2df;
-  --danger: #9b2820;
-  --danger-soft: #fbe9e7;
+  --warn: #67470b;
+  --warn-soft: #eeead9;
+  --danger: #963224;
+  --danger-soft: #f0e2de;
 
-  --focus: #1c3f66;
+  --focus: #232322;
 
-  --shadow-sheet: 0 -8px 40px rgba(10, 18, 30, 0.18);
-  --shadow-bar: 0 1px 0 rgba(10, 18, 30, 0.05);
+  --shadow-sheet: 0 -8px 40px rgba(19, 19, 18, 0.2);
+  --shadow-bar: 0 1px 0 rgba(19, 19, 18, 0.06);
 
   color-scheme: light;
 }
 
-/* --- Obsidian: near-black, brass. The default dark theme. --- */
-[data-theme='obsidian'] {
-  --paper: #0b0b0c;
-  --surface: #151517;
-  --surface-sunk: #1e1e21;
-  --rule: #2a2a2e;
-  --rule-strong: #404046;
-  --ink: #f2efe8;
-  --ink-2: #aaa59a;
-  --ink-3: #857f74;
+/* --- กลางคืน (night).
+   Warm neutral, not navy. A blue-black dark theme with a bright blue accent
+   is the default every generator reaches for; this is closer to a room with
+   the lamp off, and the accent is a dusty sage that stays out of the way of
+   the two money colours. --- */
+[data-theme='night'] {
+  --paper: #121110;
+  --surface: #1b1a18;
+  --surface-sunk: #242220;
+  --rule: #322f2c;
+  --rule-strong: #4a4640;
+  --ink: #ebe8e1;
+  --ink-2: #a7a199;
+  --ink-3: #918a7f;
 
-  --accent: #c9a227;
-  --accent-ink: #14120c;
-  --accent-soft: #2b2416;
+  --accent: #8dab97;
+  --accent-ink: #10160f;
+  --accent-soft: #1f2a23;
 
-  --btn-bg: #f2efe8;
-  --btn-ink: #151517;
+  --btn-bg: #ebe8e1;
+  --btn-ink: #1b1a18;
 
-  --credit: #54c295;
-  --debit: #e8846a;
-  --credit-soft: #12291f;
-  --debit-soft: #2c1a14;
+  --credit: #6cbe95;
+  --debit: #d9866e;
+  --credit-soft: #14261e;
+  --debit-soft: #2a1a15;
 
-  --warn: #e3b45c;
-  --warn-soft: #2b2313;
-  --danger: #f0796d;
-  --danger-soft: #2e1614;
+  --warn: #cfa863;
+  --warn-soft: #272014;
+  --danger: #dd8074;
+  --danger-soft: #2a1817;
 
-  --focus: #c9a227;
+  --focus: #8dab97;
 
-  --shadow-sheet: 0 -8px 48px rgba(0, 0, 0, 0.55);
-  --shadow-bar: 0 1px 0 rgba(255, 255, 255, 0.04);
-
-  color-scheme: dark;
-}
-
-/* --- Midnight: deep navy, cool silver-blue. --- */
-[data-theme='midnight'] {
-  --paper: #080d16;
-  --surface: #101725;
-  --surface-sunk: #182133;
-  --rule: #232e45;
-  --rule-strong: #374763;
-  --ink: #e9eef7;
-  --ink-2: #9dabc2;
-  --ink-3: #7d8ba3;
-
-  --accent: #7aa7e0;
-  --accent-ink: #08101d;
-  --accent-soft: #152740;
-
-  --btn-bg: #e9eef7;
-  --btn-ink: #101725;
-
-  --credit: #4ec9a4;
-  --debit: #f0836b;
-  --credit-soft: #0d2a24;
-  --debit-soft: #2c1a15;
-
-  --warn: #e0b768;
-  --warn-soft: #2a2414;
-  --danger: #f2827a;
-  --danger-soft: #2d1719;
-
-  --focus: #7aa7e0;
-
-  --shadow-sheet: 0 -8px 48px rgba(0, 0, 0, 0.55);
-  --shadow-bar: 0 1px 0 rgba(255, 255, 255, 0.04);
+  --shadow-sheet: 0 -8px 48px rgba(0, 0, 0, 0.6);
+  --shadow-bar: 0 1px 0 rgba(255, 255, 255, 0.045);
 
   color-scheme: dark;
 }
 
-/* Auto: follow the OS. Ivory above already covers the light case. */
+/* Auto: follow the OS. กระดาษ above already covers the light case. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]),
   [data-theme='auto'] {
-    --paper: #0b0b0c;
-    --surface: #151517;
-    --surface-sunk: #1e1e21;
-    --rule: #2a2a2e;
-    --rule-strong: #404046;
-    --ink: #f2efe8;
-    --ink-2: #aaa59a;
-    --ink-3: #857f74;
+    --paper: #121110;
+    --surface: #1b1a18;
+    --surface-sunk: #242220;
+    --rule: #322f2c;
+    --rule-strong: #4a4640;
+    --ink: #ebe8e1;
+    --ink-2: #a7a199;
+    --ink-3: #918a7f;
 
-    --accent: #c9a227;
-    --accent-ink: #14120c;
-    --accent-soft: #2b2416;
+    --accent: #8dab97;
+    --accent-ink: #10160f;
+    --accent-soft: #1f2a23;
 
-    --btn-bg: #f2efe8;
-    --btn-ink: #151517;
+    --btn-bg: #ebe8e1;
+    --btn-ink: #1b1a18;
 
-    --credit: #54c295;
-    --debit: #e8846a;
-    --credit-soft: #12291f;
-    --debit-soft: #2c1a14;
+    --credit: #6cbe95;
+    --debit: #d9866e;
+    --credit-soft: #14261e;
+    --debit-soft: #2a1a15;
 
-    --warn: #e3b45c;
-    --warn-soft: #2b2313;
-    --danger: #f0796d;
-    --danger-soft: #2e1614;
+    --warn: #cfa863;
+    --warn-soft: #272014;
+    --danger: #dd8074;
+    --danger-soft: #2a1817;
 
-    --focus: #c9a227;
+    --focus: #8dab97;
 
-    --shadow-sheet: 0 -8px 48px rgba(0, 0, 0, 0.55);
-    --shadow-bar: 0 1px 0 rgba(255, 255, 255, 0.04);
+    --shadow-sheet: 0 -8px 48px rgba(0, 0, 0, 0.6);
+    --shadow-bar: 0 1px 0 rgba(255, 255, 255, 0.045);
 
     color-scheme: dark;
   }
@@ -787,12 +760,28 @@ a {
   gap: var(--s5);
 }
 
+/* Forms get their own measure. The listing needs the full 1120px for a table;
+   a form does not, and inheriting it produced a 1340px-wide text input for
+   typing "กาแฟเซเว่น". A field wider than about 560px stops reading as a field
+   and starts reading as a stripe. */
+.page-narrow {
+  max-width: 560px;
+  margin: 0 auto;
+  width: 100%;
+}
+
 .page-head {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
   gap: var(--s3);
   flex-wrap: wrap;
+}
+
+.page-title {
+  font-size: 1.32rem;
+  font-weight: 660;
+  letter-spacing: -0.014em;
 }
 
 /* A rule under a small label is the section separator throughout. */
@@ -1104,11 +1093,45 @@ textarea::placeholder {
   color: var(--ink-3);
 }
 
+/* The amount is the one field that has to look different from the others,
+   because it is the only one that is always filled in. The ฿ sits inside the
+   box rather than in the label, so the figure reads as money at a glance. */
+.amount-box {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  background: var(--surface);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-control);
+  padding-left: var(--s3);
+  transition: border-color var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease);
+}
+
+.amount-box:focus-within {
+  border-color: var(--focus);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.amount-box .baht {
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: var(--ink-3);
+  line-height: 1;
+}
+
 .input-amount {
-  font-size: 1.6rem;
+  font-size: 1.7rem;
   font-weight: 650;
   font-variant-numeric: tabular-nums;
-  padding: var(--s2) var(--s3);
+  letter-spacing: -0.015em;
+  padding: 10px var(--s3) 10px 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+
+.input-amount:focus {
+  outline: none;
 }
 
 .btn {
@@ -1248,6 +1271,21 @@ textarea::placeholder {
 
 .segmented button:last-child {
   border-right: 0;
+}
+
+/* Inside a column-flex .field the control would stretch to the full width,
+   which pushes the divider between two unequal Thai labels somewhere near a
+   tenth of the way across. Intrinsic width, and equal halves for the two-way
+   toggles so the divider actually lands in the middle. */
+.field > .segmented,
+fieldset.field > .segmented {
+  align-self: flex-start;
+  max-width: 100%;
+}
+
+.segmented.dir button,
+.segmented.even button {
+  min-width: 124px;
 }
 
 .segmented button[aria-pressed="true"] {
@@ -1731,19 +1769,30 @@ textarea::placeholder {
 }
 
 /* ================================================ slip ================= */
+/* A row, not a drop zone. There is no drag-and-drop here — on a phone it is a
+   camera button — so a 130px dashed rectangle was promising an interaction
+   that does not exist and eating a third of the form doing it. */
 .slip-drop {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: var(--s2);
-  min-height: 108px;
+  gap: var(--s3);
+  padding: var(--s3);
   border: 1px dashed var(--rule-strong);
   border-radius: var(--r-control);
   color: var(--ink-2);
-  font-size: 0.88rem;
+  font-size: 0.9rem;
   cursor: pointer;
   background: var(--surface-sunk);
+  transition: border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+
+.slip-drop:hover {
+  border-color: var(--accent);
+  color: var(--ink);
+}
+
+.slip-drop .icon {
+  color: var(--ink-3);
 }
 
 .slip-preview {

@@ -78,9 +78,10 @@ UNKNOWN_SHOPS = [
     ("การประปานครหลวง", "บ้าน/บิล"),
 ]
 
-# Worth comparing on a free key. Google does not publish per-model limits —
-# the docs point at AI Studio — so the numbers below came from reading that
-# dashboard directly, and the scores from running this script.
+# --compare defaults to Gemma only. Measuring the alternatives already cost
+# real quota once — three runs across four models pushed Gemini 3.1 Flash Lite
+# to 27 requests in a minute against a limit of 15 — and the answer it produced
+# does not need re-deriving:
 #
 #   gemma-4-26b-a4b-it     30 RPM   14,400 RPD    10/10 on three runs
 #   gemini-3.1-flash-lite  15 RPM      500 RPD    8, 6, 8
@@ -88,14 +89,9 @@ UNKNOWN_SHOPS = [
 #   gemini-3.5-flash        5 RPM       20 RPD    twenty a day is not a tier
 #   gemma-4-31b-it         30 RPM   14,400 RPD    ignores responseSchema
 #
-# The last one is kept in the list on purpose: it fails loudly here rather
-# than quietly in production, and it is the counterexample to "pick the bigger
-# model".
+# Pass --model a,b to compare others deliberately, knowing what it spends.
 CANDIDATE_MODELS = [
     "gemma-4-26b-a4b-it",
-    "gemini-3.1-flash-lite",
-    "gemini-3.5-flash-lite",
-    "gemma-4-31b-it",
 ]
 
 
@@ -255,6 +251,9 @@ async def check_tagger(models: list[str]) -> bool:
         print(BAD, "ยังไม่ได้ตั้ง GEMINI_API_KEY ใน backend/.env")
         return False
     print(INFO, f"key ...{settings.gemini_api_key[-6:]}")
+
+    total_calls = len(models) * len(UNKNOWN_SHOPS)
+    print(INFO, f"จะยิงทั้งหมด {total_calls} ครั้ง ({len(models)} โมเดล x {len(UNKNOWN_SHOPS)} ชื่อร้าน)")
 
     scores = []
     for model in models:

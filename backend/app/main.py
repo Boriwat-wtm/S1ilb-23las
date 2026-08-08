@@ -10,6 +10,7 @@ from .database import Base, engine
 from .routers import auth, categories, entries, ledgers, slips
 from .tagger import budget as tagger_budget
 from .tagger import cache_stats as tagger_cache_stats
+from .tagger import pool as tagger_pool
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("bank")
@@ -74,7 +75,11 @@ def health() -> dict:
         # Exposed so "why did it stop guessing categories" is answerable
         # without reading logs — usually the answer is the daily budget.
         "tagger_provider": settings.tagger_provider,
-        "tagger": {**tagger_budget.snapshot(), **tagger_cache_stats()},
+        "tagger": {
+            **tagger_budget.snapshot(),
+            **tagger_cache_stats(),
+            "models": tagger_pool.snapshot(),
+        },
         "timezone": settings.app_timezone,
     }
 

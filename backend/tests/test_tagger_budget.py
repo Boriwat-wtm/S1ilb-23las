@@ -1,11 +1,13 @@
-"""Tests for the two things that keep the tagger from eating a free tier.
+"""Tests for the cache and the daily stop.
 
 The entry form calls /categories/suggest on a 400ms debounce while you type.
 Before `deep`, every one of those that missed the keyword table was a request
 to the model — a single shop name typed with a couple of pauses cost three or
-four calls. These tests pin the three defences: the tagger only runs when
-asked, the same text is never asked twice, and a self-imposed ceiling stops
-before the provider's does.
+four calls. These tests pin two of the three defences: the same text is never
+asked twice, and a whole-day ceiling stops a runaway.
+
+Per-minute pacing is the pool's job and lives in tests/test_model_pool.py, so
+the pool is replaced here with an unlimited one to keep it out of the way.
 
 Run: python -m tests.test_tagger_budget     (from backend/)
 """
@@ -26,6 +28,7 @@ os.environ.setdefault("GEMINI_API_KEY", "")
 
 from app import tagger as tagger_module  # noqa: E402
 from app.config import settings  # noqa: E402
+from app.model_pool import ModelPool  # noqa: E402
 from app.tagger import TagSuggestion, reset_state, suggest_tag  # noqa: E402
 
 passed = failed = 0
@@ -61,15 +64,20 @@ class CountingTagger:
 
 
 def install(stub) -> None:
-    tagger_module.get_tagger = lambda: stub  # type: ignore[assignment]
+    # make_tagger now receives the model the pool picked; the stub ignores it.
+    tagger_module.make_tagger = lambda model=None: stub  # type: ignore[assignment]
 
 
-original_get_tagger = tagger_module.get_tagger
-original_minute = settings.tagger_max_per_minute
+original_make_tagger = tagger_module.make_tagger
 original_day = settings.tagger_max_per_day
 
 
 async def main() -> None:
+    # The per-model pool is exercised in tests/test_model_pool.py; here it
+    # must not interfere with what is being measured.
+    tagger_module.pool = ModelPool(["stub-model"], requests_per_minute=10_000,
+                                   tokens_per_minute=10_000_000)
+    settings.tagger_provider = "gemini"
     print("\n== the cache ==")
     reset_state()
     stub = CountingTagger()
@@ -107,20 +115,18 @@ async def main() -> None:
 
     print("\n== the budget ==")
     reset_state()
-    settings.tagger_max_per_minute = 3
-    settings.tagger_max_per_day = 100
+    settings.tagger_max_per_day = 3
     stub = CountingTagger()
     install(stub)
 
     results = [await suggest_tag(f"ร้านที่ {i}", CATEGORIES) for i in range(6)]
-    check("stops at the per-minute ceiling", stub.calls == 3, stub.calls)
+    check("stops at the daily ceiling", stub.calls == 3, stub.calls)
     check("the first three answered", all(r.ok for r in results[:3]))
     check("the rest come back empty, not as errors",
           all(not r.ok and r.error is None for r in results[3:]),
           [(r.ok, r.error) for r in results[3:]])
 
     reset_state()
-    settings.tagger_max_per_minute = 100
     settings.tagger_max_per_day = 2
     stub = CountingTagger()
     install(stub)
@@ -130,7 +136,6 @@ async def main() -> None:
 
     print("\n== the budget is not spent on cache hits ==")
     reset_state()
-    settings.tagger_max_per_minute = 2
     settings.tagger_max_per_day = 100
     stub = CountingTagger()
     install(stub)
@@ -138,11 +143,10 @@ async def main() -> None:
         await suggest_tag("ร้านเดิม", CATEGORIES)
     snap = tagger_module.budget.snapshot()
     check("ten identical asks cost one call", stub.calls == 1, stub.calls)
-    check("...and one unit of budget", snap["used_this_minute"] == 1, snap)
+    check("...and one unit of budget", snap["used_today"] == 1, snap)
 
     print("\n== transport failures are not cached ==")
     reset_state()
-    settings.tagger_max_per_minute = 100
 
     class Flaky:
         name = "flaky"
@@ -170,7 +174,6 @@ async def main() -> None:
     # reset_state left the health endpoint reporting a counter that never
     # moved again — invisible unless something looks for it.
     reset_state()
-    settings.tagger_max_per_minute = 100
     settings.tagger_max_per_day = 100
     held = tagger_module.budget  # what /health holds
     stub = CountingTagger()
@@ -183,11 +186,11 @@ async def main() -> None:
 
     print("\n== the null tagger costs nothing at all ==")
     reset_state()
-    tagger_module.get_tagger = original_get_tagger
+    tagger_module.make_tagger = original_make_tagger
     settings.tagger_provider = "none"
-    before = tagger_module.budget.snapshot()["used_this_minute"]
+    before = tagger_module.budget.snapshot()["used_today"]
     r = await suggest_tag("อะไรก็ได้", CATEGORIES)
-    after = tagger_module.budget.snapshot()["used_this_minute"]
+    after = tagger_module.budget.snapshot()["used_today"]
     check("no suggestion", not r.ok)
     check("and no budget spent", before == after == 0, (before, after))
 
@@ -196,8 +199,7 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     finally:
-        tagger_module.get_tagger = original_get_tagger
-        settings.tagger_max_per_minute = original_minute
+        tagger_module.make_tagger = original_make_tagger
         settings.tagger_max_per_day = original_day
         reset_state()
     print(f"\n{'=' * 52}\n  {passed} passed, {failed} failed\n{'=' * 52}")

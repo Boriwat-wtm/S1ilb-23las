@@ -40,6 +40,7 @@ from typing import Protocol
 import httpx
 
 from .config import settings
+from .model_pool import ESTIMATED_TOKENS_PER_CALL, ModelPool
 
 log = logging.getLogger("bank.tagger")
 
@@ -53,6 +54,12 @@ class TagSuggestion:
     keyword: str | None = None
     provider: str = "none"
     error: str | None = None
+    # Which pool member answered, and what it cost — the pool needs both to
+    # meter correctly, and /health shows the model so a bad answer can be
+    # traced to the one that gave it.
+    model: str | None = None
+    tokens: int = 0
+    rate_limited: bool = False
 
     @property
     def ok(self) -> bool:
@@ -99,17 +106,17 @@ class GeminiTagger:
     the caller. The model is given the ledger's own category names and told to
     answer with one of them; anything else is discarded.
 
-    NOT YET EXERCISED AGAINST THE LIVE API — there is no key here to test
-    with. The request shape follows the documented generateContent contract
-    and the response is parsed defensively, but it needs one real call before
-    anyone relies on it.
+    Verified against the live API. Note that the 31B variant only produces
+    usable output when responseSchema is set — with only responseMimeType, or
+    with neither, it answers in prose.
     """
 
     name = "gemini"
 
-    @property
-    def model(self) -> str:
-        return settings.gemini_model
+    def __init__(self, model: str | None = None) -> None:
+        # The pool decides which model this call uses; the default is only for
+        # direct use from scripts.
+        self.model = model or (settings.gemini_model_list or ["gemma-4-26b-a4b-it"])[0]
 
     @property
     def endpoint(self) -> str:
@@ -120,9 +127,9 @@ class GeminiTagger:
 
     async def tag(self, description: str, categories: list[str]) -> TagSuggestion:
         if not settings.gemini_api_key:
-            return TagSuggestion(provider=self.name, error="ยังไม่ได้ใส่ GEMINI_API_KEY")
+            return TagSuggestion(provider=self.name, model=self.model, error="ยังไม่ได้ใส่ GEMINI_API_KEY")
         if not categories:
-            return TagSuggestion(provider=self.name, error="สมุดนี้ยังไม่มีหมวดหมู่")
+            return TagSuggestion(provider=self.name, model=self.model, error="สมุดนี้ยังไม่มีหมวดหมู่")
 
         prompt = PROMPT.format(
             categories="\n".join(f"- {c}" for c in categories),
@@ -167,36 +174,47 @@ class GeminiTagger:
             # and the free tier's per-minute cap during a burst of uploads.
             hint = ""
             if resp.status_code == 404:
-                hint = f" (ไม่พบโมเดล {self.model!r} — แก้ GEMINI_MODEL ใน .env)"
+                hint = f" (ไม่พบโมเดล {self.model!r} — แก้ GEMINI_MODELS ใน .env)"
             elif resp.status_code == 429:
-                hint = " (ชน rate limit ของ free tier — เดี๋ยวค่อยลองใหม่ ระหว่างนี้เลือกหมวดเอง)"
+                hint = " (ชน rate limit — พักโมเดลนี้แล้วสลับไปอีกตัว)"
             return TagSuggestion(
-                provider=self.name, error=f"Gemini ตอบ {resp.status_code}{hint}"
+                provider=self.name,
+                model=self.model,
+                error=f"{self.model} ตอบ {resp.status_code}{hint}",
+                rate_limited=resp.status_code == 429,
             )
 
         try:
             parts = resp.json()["candidates"][0]["content"]["parts"]
             text = "".join(p.get("text", "") for p in parts)
         except (KeyError, IndexError, TypeError):
-            return TagSuggestion(provider=self.name, error="รูปแบบคำตอบจาก Gemini ไม่ตรงที่คาด")
+            return TagSuggestion(provider=self.name, model=self.model,
+                                 error="รูปแบบคำตอบไม่ตรงที่คาด")
 
         data = _extract_json(text)
         if data is None:
-            return TagSuggestion(provider=self.name, error="Gemini ไม่ได้ตอบเป็น JSON")
+            return TagSuggestion(provider=self.name, model=self.model,
+                                 error=f"{self.model} ไม่ได้ตอบเป็น JSON")
 
         name = data.get("category")
         # Only a category this ledger actually has. A model inventing
         # "ค่าเดินทาง" when the book says "เดินทาง" must not create one.
         if not isinstance(name, str) or name.strip() not in categories:
             return TagSuggestion(
-                provider=self.name, error=f"Gemini ตอบหมวดที่ไม่มีในสมุดนี้: {name!r}"
+                provider=self.name,
+                model=self.model,
+                error=f"{self.model} ตอบหมวดที่ไม่มีในสมุดนี้: {name!r}",
             )
 
         keyword = data.get("keyword")
+        usage = resp.json().get("usageMetadata") or {}
         return TagSuggestion(
             category_name=name.strip(),
             keyword=keyword.strip() if isinstance(keyword, str) else None,
             provider=self.name,
+            model=self.model,
+            # Real usage, not the estimate the pool reserved up front.
+            tokens=int(usage.get("totalTokenCount") or 0),
         )
 
 
@@ -221,58 +239,67 @@ def _extract_json(text: str) -> dict | None:
 _TAGGERS: dict[str, type] = {"none": NullTagger, "gemini": GeminiTagger}
 
 
-def get_tagger() -> Tagger:
-    return _TAGGERS.get(settings.tagger_provider.lower(), NullTagger)()
+def make_tagger(model: str | None = None) -> Tagger:
+    """The single seam through which a tagger is constructed.
+
+    Production and the tests both go through here — the tests replace this
+    function to count calls, which only works while nothing else instantiates
+    a provider directly.
+    """
+    cls = _TAGGERS.get(settings.tagger_provider.lower(), NullTagger)
+    return cls(model) if cls is GeminiTagger else cls()
+
+
+def tagger_enabled() -> bool:
+    return settings.tagger_provider.lower() not in ("", "none")
+
+
+# Two Gemma variants, each with its own 30 requests and 16,000 tokens a minute
+# on the same key. See app/model_pool.py for why they are metered separately
+# and why a model that runs out sleeps rather than collecting 429s.
+pool = ModelPool(
+    settings.gemini_model_list,
+    requests_per_minute=settings.tagger_requests_per_minute,
+    tokens_per_minute=settings.tagger_tokens_per_minute,
+    cooldown_seconds=settings.tagger_cooldown_seconds,
+)
 
 
 class _Budget:
-    """Self-imposed call ceiling, per minute and per day.
+    """The whole-day stop.
 
-    Not a copy of the provider's limit — a lower one. Collecting a 429 means
-    the request already went out and was refused; refusing it here means the
-    user sees a category they have to pick themselves, which is the same
-    outcome they get today with the tagger switched off. One is a failure, the
-    other is just the feature not firing.
+    Per-minute pacing belongs to the pool, which meters each model separately
+    against its own allowance — duplicating it here would just mean two
+    limiters disagreeing about the same calls. What is left is a single daily
+    ceiling, well under the 14,400 the account permits, so a loop that gets
+    away from us cannot spend the allowance overnight.
 
     In-process, like the auth rate limiter: counters reset on deploy and are
     not shared across instances. Render free runs one instance, so it holds.
     """
 
     def __init__(self) -> None:
-        self._minute: deque[float] = deque()
         self._day: deque[float] = deque()
         self._lock = threading.Lock()
 
     def take(self) -> bool:
         now = time.monotonic()
         with self._lock:
-            while self._minute and self._minute[0] < now - 60:
-                self._minute.popleft()
             while self._day and self._day[0] < now - 86_400:
                 self._day.popleft()
-            if len(self._minute) >= settings.tagger_max_per_minute:
-                return False
             if len(self._day) >= settings.tagger_max_per_day:
                 return False
-            self._minute.append(now)
             self._day.append(now)
             return True
 
     def snapshot(self) -> dict[str, int]:
         now = time.monotonic()
         with self._lock:
-            minute = sum(1 for t in self._minute if t >= now - 60)
             day = sum(1 for t in self._day if t >= now - 86_400)
-        return {
-            "used_this_minute": minute,
-            "used_today": day,
-            "limit_per_minute": settings.tagger_max_per_minute,
-            "limit_per_day": settings.tagger_max_per_day,
-        }
+        return {"used_today": day, "limit_per_day": settings.tagger_max_per_day}
 
     def clear(self) -> None:
         with self._lock:
-            self._minute.clear()
             self._day.clear()
 
 
@@ -306,18 +333,22 @@ def reset_state() -> None:
     with _cache_lock:
         _cache.clear()
     budget.clear()
+    pool.clear()
 
 
-async def suggest_tag(description: str, categories: list[str]) -> TagSuggestion:
+async def suggest_tag(
+    description: str, categories: list[str], wait: bool = False
+) -> TagSuggestion:
     """Run the configured tagger. Always returns; never raises.
 
-    A category guess is a convenience. If the model is down, slow, throttled
-    or nonsensical, the user picks from a dropdown exactly as they do today —
-    nothing about saving an entry depends on this working.
+    `wait` is the difference between a person and a queue. A person is
+    standing in front of the form, so if both models are cooling the answer is
+    "no suggestion" and they pick from the dropdown — same as today with the
+    tagger off. The background draft worker sets wait=True instead, because
+    nobody is watching it and a ninety-second pause costs nothing.
     """
-    tagger = get_tagger()
-    if isinstance(tagger, NullTagger):
-        return TagSuggestion(provider=tagger.name)
+    if not tagger_enabled():
+        return TagSuggestion(provider="none")
 
     key = _cache_key(description, categories)
     with _cache_lock:
@@ -327,22 +358,41 @@ async def suggest_tag(description: str, categories: list[str]) -> TagSuggestion:
             return hit
 
     if not budget.take():
-        # Deliberately not an error: the caller shows no suggestion, which is
-        # indistinguishable from the model having nothing to say.
-        log.info("tagger budget exhausted; skipping %r", description[:40])
-        return TagSuggestion(provider=tagger.name)
+        log.info("tagger daily budget exhausted; skipping %r", description[:40])
+        return TagSuggestion(provider="gemini")
 
+    model = pool.acquire(ESTIMATED_TOKENS_PER_CALL)
+    if model is None:
+        if not wait:
+            # Not an error: indistinguishable to the caller from the model
+            # having nothing to say.
+            return TagSuggestion(provider="gemini")
+        delay = pool.wait_seconds()
+        log.info("all models cooling; waiting %.0fs", delay)
+        await asyncio.sleep(min(delay + 0.5, settings.tagger_cooldown_seconds + 5))
+        model = pool.acquire(ESTIMATED_TOKENS_PER_CALL)
+        if model is None:
+            return TagSuggestion(provider="gemini")
+
+    tagger = make_tagger(model)
     try:
         result = await asyncio.wait_for(
             tagger.tag(description, categories), timeout=TAG_TIMEOUT_SECONDS
         )
     except asyncio.TimeoutError:
-        result = TagSuggestion(provider=tagger.name, error="เดาหมวดหมู่นานเกินไป")
+        result = TagSuggestion(provider="gemini", model=model, error="เดาหมวดหมู่นานเกินไป")
     except Exception as exc:  # noqa: BLE001
         log.warning("tagger failed", exc_info=True)
         result = TagSuggestion(
-            provider=tagger.name, error=f"เดาหมวดหมู่ไม่สำเร็จ ({type(exc).__name__})"
+            provider="gemini", model=model, error=f"เดาหมวดหมู่ไม่สำเร็จ ({type(exc).__name__})"
         )
+
+    if result.tokens:
+        pool.record(model, result.tokens)
+    if result.rate_limited:
+        # The provider refused despite our own accounting saying there was
+        # room, so trust theirs and stand this model down.
+        pool.trip(model)
 
     # Transport failures are not cached — the next attempt may well succeed,
     # and caching a timeout would make one bad minute permanent.

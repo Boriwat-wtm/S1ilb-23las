@@ -44,35 +44,47 @@ class Settings(BaseSettings):
     tagger_provider: str = "none"
     gemini_api_key: str = ""
 
-    # Gemma, not Gemini — same endpoint, very different free tier.
+    # Two models, pooled. Gemma, not Gemini — same endpoint, very different
+    # free tier.
     #
     # Measured on a real key against ten deliberately awkward Thai shop names,
     # three runs each:
     #
     #   gemma-4-26b-a4b-it     10, 10, 10   1.71 s   30 RPM   14,400 RPD
-    #   gemini-3.1-flash-lite   8,  6,  8   1.10 s   15 RPM      500 RPD
-    #   gemini-3.5-flash-lite   7,  6       1.17 s   15 RPM      500 RPD
-    #   gemma-4-31b-it         unusable — ignores responseSchema entirely
+    #   gemma-4-31b-it          8/10         2.14 s   30 RPM   14,400 RPD
+    #   gemini-3.1-flash-lite   8,  6,  8    1.10 s   15 RPM      500 RPD
+    #   gemini-3.5-flash-lite   7,  6        1.17 s   15 RPM      500 RPD
+    #   gemini-3.5 / 3.6 flash    —            —       5 RPM       20 RPD
     #
-    # The small Gemma wins on both axes at once: twenty-eight times the daily
-    # allowance, and the only one that answered identically on every run even
-    # though all of them were called at temperature 0. The larger Gemma is the
-    # reminder that bigger is not automatically better — it cannot produce
-    # structured output here at all, which is the thing keeping wrong
-    # categories out.
+    # Both Gemma variants have their own 30/16K per minute on the same key, so
+    # pooling them doubles throughput without a second vendor. The 26B leads,
+    # the 31B is the understudy.
+    #
+    # Note on the 31B: it only works with responseSchema set. Given just
+    # responseMimeType, or nothing, it answers in prose and never produces
+    # usable JSON. An earlier note here called it unusable outright — that was
+    # a bug in the throwaway test script, which parsed with json.loads instead
+    # of the fence-tolerant helper the real code uses.
     #
     # Configurable because ids get renamed and retired on Google's schedule,
     # not ours: the first default here, written from memory, was
     # gemini-2.0-flash, which had already been shut down.
-    gemini_model: str = "gemma-4-26b-a4b-it"
+    gemini_models: str = "gemma-4-26b-a4b-it,gemma-4-31b-it"
 
-    # Self-imposed ceilings, deliberately under the provider's. Better to
-    # degrade to "no suggestion" on our side than collect a 429 from theirs —
-    # a quiet miss is invisible, a rate-limit error is not. Roughly 7% of the
-    # measured daily allowance, still far beyond what this app can use once
-    # the keyword table starts filling in.
-    tagger_max_per_minute: int = 20
+    # Per model, per minute — read off the account's own dashboard. Hitting
+    # either puts that model to sleep for the cooldown rather than letting the
+    # next call collect a 429.
+    tagger_requests_per_minute: int = 30
+    tagger_tokens_per_minute: int = 16_000
+    tagger_cooldown_seconds: float = 90.0
+
+    # A whole-day stop, well under the 14,400 the account allows, so a runaway
+    # loop cannot burn the allowance while nobody is watching.
     tagger_max_per_day: int = 1000
+
+    @property
+    def gemini_model_list(self) -> list[str]:
+        return [m.strip() for m in self.gemini_models.split(",") if m.strip()]
 
     # --- display ---
     app_timezone: str = "Asia/Bangkok"

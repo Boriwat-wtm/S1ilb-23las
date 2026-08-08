@@ -16,7 +16,19 @@ if _url.startswith("postgresql"):
         "pool_recycle": 300,
         "pool_size": 3,
         "max_overflow": 2,
-        "connect_args": {"connect_timeout": 10},
+        "connect_args": {
+            "connect_timeout": 10,
+            # psycopg3 starts preparing a statement server-side once it has
+            # seen it five times. Neon's pooled endpoint is PgBouncer in
+            # transaction mode, where the connection you get back is not
+            # necessarily the one that holds the prepared statement, and the
+            # symptom is an intermittent "prepared statement does not exist"
+            # under load rather than a clean failure on the first request.
+            # Nothing here is query-bound — the app is capped at five
+            # connections on a 0.1 vCPU instance — so the plan cache is worth
+            # nothing next to knowing this cannot happen.
+            "prepare_threshold": None,
+        },
     }
 else:
     # Only reached by the offline smoke test, which points DATABASE_URL at a

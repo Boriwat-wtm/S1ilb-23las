@@ -132,6 +132,21 @@ class GeminiTagger:
                 "temperature": 0,
                 "maxOutputTokens": 120,
                 "responseMimeType": "application/json",
+                # The enum is what actually stops a wrong tag, far more than
+                # picking a bigger model would. Constrained decoding means the
+                # category cannot come back as something this ledger does not
+                # have — no invented "ค่าเดินทาง" next to an existing "เดินทาง",
+                # no English translation of a Thai category, no prose. The
+                # check against `categories` below stays as a belt-and-braces
+                # guard for the case where a model ignores the schema.
+                "responseSchema": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "category": {"type": "STRING", "enum": categories},
+                        "keyword": {"type": "STRING", "nullable": True},
+                    },
+                    "required": ["category"],
+                },
             },
         }
 
@@ -143,14 +158,14 @@ class GeminiTagger:
             )
 
         if resp.status_code != 200:
-            # 404 here almost always means the model id is wrong or retired,
-            # which is worth saying out loud rather than reporting as a
-            # generic failure — it is fixed by editing GEMINI_MODEL.
-            hint = (
-                f" (ไม่พบโมเดล {self.model!r} — แก้ GEMINI_MODEL ใน .env)"
-                if resp.status_code == 404
-                else ""
-            )
+            # Two failures are common enough to name, because both are fixed
+            # by a config change rather than by debugging: a retired model id,
+            # and the free tier's per-minute cap during a burst of uploads.
+            hint = ""
+            if resp.status_code == 404:
+                hint = f" (ไม่พบโมเดล {self.model!r} — แก้ GEMINI_MODEL ใน .env)"
+            elif resp.status_code == 429:
+                hint = " (ชน rate limit ของ free tier — เดี๋ยวค่อยลองใหม่ ระหว่างนี้เลือกหมวดเอง)"
             return TagSuggestion(
                 provider=self.name, error=f"Gemini ตอบ {resp.status_code}{hint}"
             )

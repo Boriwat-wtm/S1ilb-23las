@@ -43,8 +43,15 @@ class Settings(BaseSettings):
     tagger_provider: str = "none"
     gemini_api_key: str = ""
     # Configurable because model ids get renamed and retired on Google's
-    # schedule, not ours, and swapping one should not need a code change.
-    gemini_model: str = "gemini-2.0-flash"
+    # schedule, not ours, and swapping one should not need a code change —
+    # the previous default here, gemini-2.0-flash, has already been shut down.
+    #
+    # A flash-lite is the right size for this job: sorting a short shop name
+    # into one of about ten well-separated categories is near the ceiling for
+    # any current model, so a larger one buys almost no accuracy and costs
+    # requests-per-minute, which is the resource that actually binds when a
+    # stack of slips is uploaded at once.
+    gemini_model: str = "gemini-3.5-flash-lite"
 
     # --- display ---
     app_timezone: str = "Asia/Bangkok"

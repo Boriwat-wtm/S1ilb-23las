@@ -208,9 +208,38 @@ class CategoryCreate(BaseModel):
     keywords: list[str] = []
 
 
+class CategoryUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=60)
+    emoji: str | None = None
+    sort_order: int | None = None
+
+
+class KeywordOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    keyword: str
+    # seed | learned | ai | manual — so a category that starts guessing wrong
+    # can be traced to whoever taught it that.
+    source: str
+    priority: int
+
+
+class CategoryDetail(CategoryOut):
+    keywords: list[KeywordOut] = []
+    entry_count: int = 0
+
+
+class KeywordCreate(BaseModel):
+    keyword: str = Field(min_length=1, max_length=80)
+
+
 class CategorySuggestion(BaseModel):
     category: CategoryOut | None = None
     matched_keyword: str | None = None
+    # "keyword" when the ledger's own table answered, "ai" when the tagger did,
+    # absent on a miss. Surfaced so the UI can say where a guess came from.
+    source: str | None = None
 
 
 # --------------------------------------------------------------------------

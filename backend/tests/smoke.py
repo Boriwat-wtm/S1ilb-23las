@@ -476,6 +476,116 @@ check("a viewer cannot batch-create", client.post(
 check("a non-member cannot batch-create into someone else's book", client.post(
     f"/ledgers/{pid}/entries/batch", headers=MAL, json=batch).status_code == 404)
 
+print("\n== learning from corrections ==")
+# Nothing seeded knows this shop, so the first guess must miss.
+NEW_SHOP = "After You สาขาสยาม"
+r = client.get(f"/ledgers/{sid}/categories/suggest", params={"text": NEW_SHOP},
+               headers=BOW).json()
+check("an unknown shop is a miss to begin with", r["category"] is None, r)
+
+food_shared = next(
+    c["id"] for c in client.get(f"/ledgers/{sid}/categories", headers=BOW).json()
+    if c["name"].startswith("อาหาร")
+)
+check("filing it by hand is accepted", client.post(
+    f"/ledgers/{sid}/entries", headers=BOW,
+    json={"occurred_at": "2026-08-10T10:00:00", "description": NEW_SHOP,
+          "amount": "155", "direction": "out", "category_id": food_shared},
+).status_code == 201)
+
+r = client.get(f"/ledgers/{sid}/categories/suggest", params={"text": NEW_SHOP},
+               headers=BOW).json()
+check("...and the same shop is guessed correctly next time",
+      r["category"] and r["category"]["id"] == food_shared, r)
+check("the guess now comes from the keyword table, free",
+      r.get("source") == "keyword", r)
+# Learning must generalise past the exact string, or it is just a cache of
+# one description.
+r = client.get(f"/ledgers/{sid}/categories/suggest",
+               params={"text": "After You เอ็มควอเทียร์"}, headers=BOW).json()
+check("a different branch of the same shop also resolves",
+      r["category"] and r["category"]["id"] == food_shared, r)
+
+# Re-filing an entry is the clearest correction there is.
+travel_shared = next(
+    c["id"] for c in client.get(f"/ledgers/{sid}/categories", headers=BOW).json()
+    if c["name"] == "เดินทาง"
+)
+r = client.post(f"/ledgers/{sid}/entries", headers=BOW, json={
+    "occurred_at": "2026-08-10T11:00:00", "description": "Bolt ไปสนามบิน",
+    "amount": "480", "direction": "out"})
+moved = r.json()
+client.put(f"/ledgers/{sid}/entries/{moved['id']}", headers=BOW, json={
+    "occurred_at": "2026-08-10T11:00:00", "description": "Bolt ไปสนามบิน",
+    "amount": "480", "direction": "out", "category_id": travel_shared,
+    "version": moved["version"]})
+r = client.get(f"/ledgers/{sid}/categories/suggest",
+               params={"text": "Bolt ไปสนามบิน"}, headers=BOW).json()
+check("re-filing an entry teaches the table too",
+      r["category"] and r["category"]["id"] == travel_shared, r)
+
+check("nothing is learned when the guess was already right",
+      client.get(f"/ledgers/{sid}/categories/detail", headers=BOW).status_code == 200)
+
+print("\n== categories and keywords ==")
+detail = client.get(f"/ledgers/{sid}/categories/detail", headers=BOW).json()
+check("detail lists keywords per category",
+      any(c["keywords"] for c in detail), [c["name"] for c in detail])
+check("detail carries usage counts",
+      any(c["entry_count"] > 0 for c in detail), detail[0])
+sources = {k["source"] for c in detail for k in c["keywords"]}
+check("seeded and learned keywords are distinguishable",
+      "seed" in sources and "learned" in sources, sources)
+
+food_detail = next(c for c in detail if c["id"] == food_shared)
+r = client.post(f"/ledgers/{sid}/categories/{food_shared}/keywords", headers=BOW,
+                json={"keyword": "ก๋วยจั๊บญวน"})
+check("adding a keyword by hand 201", r.status_code == 201, r.text)
+check("...marked as manual", r.json()["source"] == "manual", r.json())
+new_kw_id = r.json()["id"]
+check("...and it takes effect immediately",
+      client.get(f"/ledgers/{sid}/categories/suggest",
+                 params={"text": "ก๋วยจั๊บญวนเจ๊เล็ก"},
+                 headers=BOW).json()["category"]["id"] == food_shared)
+
+print("\n== the guard that makes automatic writing safe ==")
+for bad, why in (("ร้าน", "generic"), ("ค่า", "generic"), ("ab", "too short"),
+                 ("12345", "digits only")):
+    check(f"refuses {bad!r} ({why})", client.post(
+        f"/ledgers/{sid}/categories/{food_shared}/keywords",
+        headers=BOW, json={"keyword": bad}).status_code == 422)
+check("refuses a word already used elsewhere", client.post(
+    f"/ledgers/{sid}/categories/{food_shared}/keywords",
+    headers=BOW, json={"keyword": "แกร็บ"}).status_code in (409, 422))
+check("refuses a word that would shadow another category's", client.post(
+    f"/ledgers/{sid}/categories/{food_shared}/keywords",
+    headers=BOW, json={"keyword": "แกร็บไบค์"}).status_code == 409)
+
+check("a keyword can be deleted", client.delete(
+    f"/ledgers/{sid}/categories/{food_shared}/keywords/{new_kw_id}",
+    headers=BOW).status_code == 204)
+check("...and stops matching", client.get(
+    f"/ledgers/{sid}/categories/suggest", params={"text": "ก๋วยจั๊บญวนเจ๊เล็ก"},
+    headers=BOW).json()["category"] is None)
+check("deleting a keyword from another ledger -> 404", client.delete(
+    f"/ledgers/{pid}/categories/{food_shared}/keywords/{new_kw_id}",
+    headers=BOW).status_code == 404)
+
+check("renaming a category", client.patch(
+    f"/ledgers/{sid}/categories/{travel_shared}", headers=BOW,
+    json={"name": "เดินทาง/ขนส่ง"}).status_code == 200)
+client.patch(f"/ledgers/{sid}/categories/{travel_shared}", headers=BOW,
+             json={"name": "เดินทาง"})
+check("renaming onto an existing name -> 409", client.patch(
+    f"/ledgers/{sid}/categories/{travel_shared}", headers=BOW,
+    json={"name": food_detail["name"]}).status_code == 409)
+
+check("a viewer cannot add keywords", client.post(
+    f"/ledgers/{sid}/categories/{food_shared}/keywords",
+    headers=MAL, json={"keyword": "อะไรก็ได้"}).status_code in (403, 404))
+check("a non-member cannot read another book's keyword table", client.get(
+    f"/ledgers/{pid}/categories/detail", headers=MAL).status_code == 404)
+
 print("\n== slips (storage disabled) ==")
 check("undecodable image -> 400, never 500", client.post(
     f"/ledgers/{sid}/slips/upload", headers=BOW,

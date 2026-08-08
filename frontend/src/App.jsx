@@ -7,6 +7,7 @@ import { useAuth } from './auth/AuthContext'
 import { LedgerProvider } from './data/LedgerContext'
 import AccountPage from './pages/AccountPage'
 import BatchEntry from './pages/BatchEntry'
+import CategoriesPage from './pages/CategoriesPage'
 import Entries from './pages/Entries'
 import EntryEdit from './pages/EntryEdit'
 import EntryNew from './pages/EntryNew'
@@ -38,6 +39,7 @@ export default function App() {
           <Route path="summary" element={<SummaryPage />} />
           <Route path="members" element={<MembersPage />} />
           <Route path="settings" element={<LedgerSettings />} />
+          <Route path="categories" element={<CategoriesPage />} />
           <Route path="account" element={<AccountPage />} />
           <Route path="more" element={<MorePage />} />
           <Route path="ledgers/new" element={<LedgerNew />} />

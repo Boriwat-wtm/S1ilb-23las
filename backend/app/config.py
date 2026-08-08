@@ -32,9 +32,16 @@ class Settings(BaseSettings):
 
     # --- ocr ---
     # "none" = no extraction, the form just opens blank (manual entry).
-    # "google" = Google Cloud Vision, wired later.
+    # "google" = Google Cloud Vision.
     ocr_provider: str = "none"
     google_vision_api_key: str = ""
+
+    # --- category tagger ---
+    # Only consulted when the ledger's own keyword table has no match, and its
+    # answer is written back as a keyword, so cost decays toward zero.
+    # "none" = a miss stays a miss and the user picks. "gemini" = Google Gemini.
+    tagger_provider: str = "none"
+    gemini_api_key: str = ""
 
     # --- display ---
     app_timezone: str = "Asia/Bangkok"

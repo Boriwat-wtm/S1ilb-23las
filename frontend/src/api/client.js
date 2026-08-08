@@ -173,8 +173,25 @@ export const apiRemoveMember = (ledgerId, memberId) =>
 
 // --- categories ------------------------------------------------------------
 export const apiCategories = (ledgerId) => api(`/ledgers/${ledgerId}/categories`)
+export const apiCategoriesDetail = (ledgerId) =>
+  api(`/ledgers/${ledgerId}/categories/detail`)
 export const apiSuggestCategory = (ledgerId, text, signal) =>
   api(`/ledgers/${ledgerId}/categories/suggest${qs({ text })}`, { signal })
+export const apiCreateCategory = (ledgerId, payload) =>
+  api(`/ledgers/${ledgerId}/categories`, { method: 'POST', body: payload })
+export const apiUpdateCategory = (ledgerId, categoryId, payload) =>
+  api(`/ledgers/${ledgerId}/categories/${categoryId}`, { method: 'PATCH', body: payload })
+export const apiDeleteCategory = (ledgerId, categoryId) =>
+  api(`/ledgers/${ledgerId}/categories/${categoryId}`, { method: 'DELETE' })
+export const apiAddKeyword = (ledgerId, categoryId, keyword) =>
+  api(`/ledgers/${ledgerId}/categories/${categoryId}/keywords`, {
+    method: 'POST',
+    body: { keyword },
+  })
+export const apiDeleteKeyword = (ledgerId, categoryId, keywordId) =>
+  api(`/ledgers/${ledgerId}/categories/${categoryId}/keywords/${keywordId}`, {
+    method: 'DELETE',
+  })
 
 // --- entries ---------------------------------------------------------------
 export const apiEntries = (ledgerId, filters = {}) =>

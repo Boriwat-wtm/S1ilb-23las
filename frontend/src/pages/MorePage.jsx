@@ -63,6 +63,12 @@ export default function MorePage() {
               hint="ดูว่าใครเห็นสมุดนี้ และเชิญคนเพิ่ม"
             />
             <Row
+              to="/categories"
+              icon="list"
+              title="หมวดหมู่และคำค้น"
+              hint="ดูว่าระบบเรียนรู้อะไรไปบ้าง แก้คำที่เดาผิด"
+            />
+            <Row
               to="/settings"
               icon="gear"
               title="ตั้งค่าสมุด"

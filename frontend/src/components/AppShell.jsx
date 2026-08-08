@@ -137,6 +137,10 @@ export default function AppShell() {
               <Icon name="users" size={18} />
               สมาชิก
             </NavLink>
+            <NavLink to="/categories" className={railLink}>
+              <Icon name="list" size={18} />
+              หมวดหมู่
+            </NavLink>
             <NavLink to="/settings" className={railLink}>
               <Icon name="gear" size={18} />
               ตั้งค่าสมุด

@@ -8,7 +8,7 @@ one member's custom category showing up in someone else's private book.
 
 from sqlalchemy.orm import Session
 
-from .models import KIND_CASHFLOW, KIND_DEBT, Category, CategoryKeyword
+from .models import KIND_CASHFLOW, KIND_DEBT, KW_SEED, Category, CategoryKeyword
 
 # (name, emoji, sort_order, keywords)
 CASHFLOW_CATEGORIES: list[tuple[str, str, int, list[str]]] = [
@@ -86,5 +86,6 @@ def seed_ledger_categories(db: Session, ledger_id: int, kind: str) -> None:
                     ledger_id=ledger_id,
                     keyword=kw.lower().strip(),
                     category_id=category.id,
+                    source=KW_SEED,
                 )
             )

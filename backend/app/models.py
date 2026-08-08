@@ -180,6 +180,17 @@ class Category(Base):
     )
 
 
+# Where a keyword came from. Kept because three very different things write to
+# this table — the starter template, the user correcting a guess, and (later)
+# an LLM — and when a category starts guessing wrong, the first question is
+# always "who put this word here".
+KW_SEED = "seed"        # copied from the starter template on ledger creation
+KW_LEARNED = "learned"  # inferred from the user overriding a suggestion
+KW_AI = "ai"            # returned by the tagger on a keyword miss
+KW_MANUAL = "manual"    # typed by the user in the categories screen
+KEYWORD_SOURCES = (KW_SEED, KW_LEARNED, KW_AI, KW_MANUAL)
+
+
 class CategoryKeyword(Base):
     __tablename__ = "category_keywords"
 
@@ -191,7 +202,13 @@ class CategoryKeyword(Base):
     category_id: Mapped[int] = mapped_column(
         ForeignKey("categories.id", ondelete="CASCADE"), index=True
     )
+    # Ties break on priority first, then keyword length. Anything learned from
+    # the user outranks the template it is correcting.
     priority: Mapped[int] = mapped_column(Integer, default=0)
+    source: Mapped[str] = mapped_column(String(16), default=KW_SEED)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
     category: Mapped["Category"] = relationship(back_populates="keywords")
 

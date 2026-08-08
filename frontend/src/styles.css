@@ -1770,6 +1770,76 @@ fieldset.field > .segmented {
   }
 }
 
+/* ================================================ keywords =============
+   Chips rather than a list, because the useful reading is "what does this
+   category know" at a glance, and the provenance tag is what turns a wrong
+   guess into something you can actually find and delete. */
+.kw-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.kw {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px 3px 9px;
+  border: 1px solid var(--rule);
+  border-radius: 99px;
+  background: var(--surface);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+/* Anything not from the starter template is marked, because those are the
+   rows nobody chose to review. */
+.kw-learned,
+.kw-ai,
+.kw-manual {
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  background: var(--accent-soft);
+}
+
+.kw-source {
+  font-size: 0.68rem;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.kw-learned .kw-source,
+.kw-ai .kw-source,
+.kw-manual .kw-source {
+  color: var(--accent);
+}
+
+.kw-remove {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: 99px;
+  background: none;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition: background-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+
+.kw-remove:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.kw-remove .icon {
+  vertical-align: 0;
+}
+
 /* ================================================ batch drafts =========
    A row per slip, laid out as a block rather than a table row: a table with
    five editable controls per line is unusable under about 700px, and this is

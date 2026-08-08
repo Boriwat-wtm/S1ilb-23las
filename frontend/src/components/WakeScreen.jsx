@@ -84,10 +84,12 @@ export default function WakeScreen({ onReady }) {
   }, [attempt])
 
   return (
-    <main className="centered">
-      <div className="auth-card">
-        <div className="auth-mark" aria-hidden="true">฿</div>
-        <h1 className="t-heading">Bank</h1>
+    <main className="auth">
+      <div className="auth-card wake-card">
+        <header className="auth-brand">
+          <span className="auth-mark" aria-hidden="true">฿</span>
+          <span className="auth-wordmark">Bank</span>
+        </header>
 
         <div
           className="wake-bar"

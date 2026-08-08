@@ -187,7 +187,7 @@ export default function MembersPage() {
                 spellCheck="false"
                 required
               />
-              <span className="t-faint" style={{ fontSize: '0.74rem' }}>
+              <span className="field-hint">
                 เขาต้องสมัครไว้ก่อน แล้วบอกชื่อผู้ใช้ให้คุณ
               </span>
             </label>

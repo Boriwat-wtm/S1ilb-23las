@@ -1060,6 +1060,26 @@ table.ledger .running {
   flex-wrap: wrap;
 }
 
+/* Help text and small print. One size and colour for every explanatory line
+   in the app, replacing a scatter of inline 0.74/0.76/0.78rem overrides. */
+.field-hint,
+.small-print {
+  display: block;
+  font-size: 0.76rem;
+  line-height: 1.45;
+  color: var(--ink-3);
+}
+
+.small-print {
+  margin: 0;
+}
+
+/* Child combinator, purely to outrank `.field > span` above — which is the
+   label rule and would otherwise also match a hint sitting in the same label. */
+.field > .field-hint {
+  margin-top: 2px;
+}
+
 input,
 select,
 textarea {
@@ -1175,6 +1195,32 @@ textarea::placeholder {
 
 .btn-block {
   width: 100%;
+}
+
+/* The primary action has to outrank the inputs above it. At the same height
+   as a text field it reads as one more field rather than the way forward. */
+.btn-lg {
+  font-size: 1rem;
+  padding: 13px 18px;
+}
+
+/* An inline action that behaves like a link: no chrome, only the underline. */
+.link-btn {
+  font: inherit;
+  font-weight: 600;
+  color: var(--accent);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+  transition: opacity var(--dur-1) var(--ease);
+}
+
+.link-btn:hover {
+  opacity: 0.75;
 }
 
 /* Segmented control: view switch, direction switch. One shared component so
@@ -1727,51 +1773,140 @@ textarea::placeholder {
 }
 
 /* ================================================ auth / wake ========== */
-.centered {
+/* ================================================ auth =================
+   Rhythm, not a uniform gap. Everything here used to sit 12px apart — mark,
+   heading, control, field, field, button — so the eye read six loose objects
+   instead of one form. Now the spacing groups: the lockup is tight, the
+   fields are tight to each other, and the breaks fall between groups.
+
+   Optical centring: extra padding at the bottom, because a block centred by
+   the maths always looks like it has sagged.
+   ======================================================================= */
+.auth {
+  position: relative;
   min-height: 100dvh;
   display: grid;
   place-items: center;
-  padding: var(--s5);
+  padding: var(--s6) var(--s5) calc(var(--s6) + 5vh);
+}
+
+.auth-theme {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + var(--s3));
+  right: var(--s3);
 }
 
 .auth-card {
   width: 100%;
-  max-width: 340px;
+  max-width: 352px;
+  display: flex;
+  flex-direction: column;
+}
+
+.auth-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.auth-wordmark {
+  font-size: 1.32rem;
+  font-weight: 680;
+  letter-spacing: -0.02em;
+}
+
+.auth-tagline {
+  margin: 10px 0 0;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  /* The break between the pitch and the form. */
+  margin-top: var(--s5);
+  padding-top: var(--s5);
+  border-top: 1px solid var(--rule);
+}
+
+.auth-title {
+  font-size: 1.12rem;
+  font-weight: 650;
+  letter-spacing: -0.008em;
+  margin-bottom: var(--s4);
+}
+
+/* Fields sit closer to each other than to the button, so they read as one
+   block with one action beneath it. */
+.auth-fields {
   display: flex;
   flex-direction: column;
   gap: var(--s3);
+  margin-bottom: var(--s5);
+}
+
+.auth-form .notice {
+  margin-bottom: var(--s3);
+}
+
+.auth-switch {
+  margin: var(--s4) 0 0;
+  text-align: center;
+  font-size: 0.88rem;
+  color: var(--ink-2);
 }
 
 .auth-mark {
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: var(--r-surface);
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 11px;
   background: var(--accent);
   color: var(--accent-ink);
-  font-size: 1.4rem;
+  font-size: 1.3rem;
   font-weight: 700;
+  /* The glyph's ink is heavier below the baseline than above it, so a
+     mathematically centred ฿ reads low inside its tile. */
+  padding-bottom: 2px;
+}
+
+/* Shares the auth composition so the very first screen of a cold start and
+   the sign-in screen behind it read as the same product, not two drafts. */
+.wake-card {
+  gap: 0;
 }
 
 .wake-bar {
   height: 3px;
+  margin-top: var(--s5);
   background: var(--surface-sunk);
-  border: 1px solid var(--rule);
+  border-radius: 99px;
   overflow: hidden;
 }
 
 .wake-bar-fill {
   height: 100%;
+  border-radius: 99px;
   background: var(--accent);
   transition: width 0.45s cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
 .wake-msg {
-  min-height: 2.6em;
+  /* Reserved height, so a message swapping from one line to two does not
+     shunt the bar up and down for the whole minute the user is waiting. */
+  min-height: 3em;
+  margin: var(--s3) 0 0;
   font-size: 0.88rem;
+  line-height: 1.5;
   color: var(--ink-2);
-  margin: 0;
+}
+
+.wake-card .notice {
+  margin-top: var(--s2);
 }
 
 /* --------------------------------------------------------------- misc */

@@ -86,7 +86,7 @@ export default function AccountPage() {
           <div className="field">
             <span>ชื่อผู้ใช้</span>
             <div className="static-field mono">@{user?.username}</div>
-            <span className="t-faint" style={{ fontSize: '0.76rem' }}>
+            <span className="field-hint">
               เปลี่ยนไม่ได้ — คนอื่นใช้ชื่อนี้เชิญคุณเข้าสมุด ถ้าเปลี่ยนได้ คำเชิญที่ส่งไปแล้วจะพัง
             </span>
           </div>
@@ -100,7 +100,7 @@ export default function AccountPage() {
               maxLength={80}
               required
             />
-            <span className="t-faint" style={{ fontSize: '0.76rem' }}>
+            <span className="field-hint">
               ชื่อนี้จะขึ้นข้างรายการที่คุณลงในทุกสมุด
             </span>
           </label>
@@ -168,7 +168,7 @@ export default function AccountPage() {
             </label>
           </div>
 
-          <p className="t-faint" style={{ fontSize: '0.78rem', margin: 0 }}>
+          <p className="small-print">
             อย่างน้อย 8 ตัว · เปลี่ยนแล้วอุปกรณ์อื่นที่ยังค้างอยู่จะถูกให้ออกจากระบบทั้งหมด
           </p>
 
@@ -193,7 +193,7 @@ export default function AccountPage() {
               {ledgerGlyph(l)}
               <span className="grow">
                 <span className="rail-item-title">{l.name}</span>
-                <span className="t-faint" style={{ fontSize: '0.76rem' }}>
+                <span className="field-hint">
                   {l.kind === 'debt' ? 'ยอดหนี้' : 'รายรับ–รายจ่าย'} ·{' '}
                   {l.member_count > 1 ? `แชร์กับ ${l.member_count - 1} คน` : 'ส่วนตัว'}
                 </span>
@@ -211,7 +211,7 @@ export default function AccountPage() {
               {ledgerGlyph(l)}
               <span className="grow">
                 <span className="rail-item-title">{l.name}</span>
-                <span className="t-faint" style={{ fontSize: '0.76rem' }}>
+                <span className="field-hint">
                   ของ {l.owner.display_name}
                 </span>
               </span>

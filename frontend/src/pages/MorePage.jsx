@@ -82,6 +82,12 @@ export default function MorePage() {
         </div>
         <ul className="link-list">
           <Row
+            to="/batch"
+            icon="camera"
+            title="เพิ่มหลายรายการ"
+            hint="โยนสลิปหลายใบทีเดียว ตรวจแล้วบันทึกพร้อมกัน"
+          />
+          <Row
             to="/ledgers/new"
             icon="plus"
             title="สร้างสมุดใหม่"

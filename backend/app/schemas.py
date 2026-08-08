@@ -273,6 +273,32 @@ class EntryUpdate(EntryBase):
     slip_path: str | None = None
 
 
+MAX_BATCH = 50
+
+
+class EntryBatchCreate(BaseModel):
+    entries: list[EntryCreate] = Field(min_length=1, max_length=MAX_BATCH)
+
+
+class EntryBatchError(BaseModel):
+    index: int
+    message: str
+    duplicate_of_id: int | None = None
+
+
+class EntryBatchResult(BaseModel):
+    """Partial success is the normal outcome, not an edge case.
+
+    Someone photographs ten slips and two of them were already filed. Failing
+    the whole batch would make them re-do the eight that were fine, so the
+    good rows are saved and the bad ones come back with their original index
+    so the client can leave exactly those on screen.
+    """
+
+    created: list["EntryOut"]
+    errors: list[EntryBatchError]
+
+
 class EntryOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

@@ -1113,18 +1113,20 @@ textarea::placeholder {
 }
 
 .amount-box .baht {
-  font-size: 1.35rem;
+  font-size: 1.02rem;
   font-weight: 600;
   color: var(--ink-3);
   line-height: 1;
 }
 
+/* Big enough to be obviously the important field, not so big it becomes a
+   banner. 1.7rem in a 560px column was a headline with a cursor in it. */
 .input-amount {
-  font-size: 1.7rem;
+  font-size: 1.2rem;
   font-weight: 650;
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.015em;
-  padding: 10px var(--s3) 10px 0;
+  letter-spacing: -0.01em;
+  padding: 9px var(--s3) 9px 0;
   border: 0;
   border-radius: 0;
   background: none;
@@ -1765,6 +1767,118 @@ fieldset.field > .segmented {
   /* A centred dialog is not draggable, so the handle would be a lie. */
   .sheet-grip {
     display: none;
+  }
+}
+
+/* ================================================ batch drafts =========
+   A row per slip, laid out as a block rather than a table row: a table with
+   five editable controls per line is unusable under about 700px, and this is
+   a screen someone will use standing in a shop with a fistful of receipts. */
+.draft-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+
+.draft {
+  display: grid;
+  grid-template-columns: 26px 1fr;
+  gap: var(--s3);
+  padding: var(--s3);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-surface);
+}
+
+.draft.has-error {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.draft-index {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ink-3);
+  text-align: right;
+  padding-top: 9px;
+}
+
+.draft-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  min-width: 0;
+}
+
+.draft-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2);
+}
+
+.draft-line > input[type='datetime-local'],
+.draft-line > select {
+  flex: 1 1 190px;
+  width: auto;
+  font-size: 0.88rem;
+  padding: 7px 10px;
+}
+
+.draft-amount {
+  flex: 1 1 130px;
+  min-width: 120px;
+}
+
+.draft-amount .input-amount {
+  font-size: 1.05rem;
+  padding: 6px var(--s2) 6px 0;
+}
+
+.draft .segmented button {
+  font-size: 0.8rem;
+  padding: 6px 10px;
+  min-width: 0;
+}
+
+.draft-thumb {
+  grid-column: 2;
+  justify-self: start;
+  max-height: 116px;
+  max-width: 100%;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-control);
+}
+
+.draft-error {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--danger);
+}
+
+/* Sticky, because the point of the screen is the one button at the end of it
+   and a stack of fifteen drafts otherwise buries it. */
+.draft-footer {
+  position: sticky;
+  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  padding: var(--s3);
+  background: var(--surface);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-surface);
+  box-shadow: var(--shadow-sheet);
+}
+
+@media (min-width: 900px) {
+  .draft-footer {
+    bottom: var(--s4);
   }
 }
 

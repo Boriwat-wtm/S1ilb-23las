@@ -16,6 +16,9 @@ from ..models import DIR_IN, DIR_OUT, Category, Entry, User
 from ..schemas import (
     CategoryOut,
     CategoryTotal,
+    EntryBatchCreate,
+    EntryBatchError,
+    EntryBatchResult,
     EntryCreate,
     EntryOut,
     EntryPage,
@@ -319,6 +322,97 @@ def list_entries(
         limit=limit,
         offset=offset,
     )
+
+
+@router.post("/batch", response_model=EntryBatchResult, status_code=status.HTTP_201_CREATED)
+def create_entries_batch(
+    payload: EntryBatchCreate, ctx: LedgerWrite, db: DbSession
+) -> EntryBatchResult:
+    """Save a screenful of drafts in one request.
+
+    Rows are committed individually rather than as one transaction, on
+    purpose: photographing ten slips and finding two already filed should save
+    the eight that were fine, not make the user redo all ten. Failures come
+    back with the index they arrived at so the client can leave exactly those
+    rows on screen.
+
+    One request rather than N also matters on Render's free tier, where each
+    round trip to a cold instance is expensive.
+    """
+    ledger_id = ctx.ledger.id
+    created: list[EntryOut] = []
+    errors: list[EntryBatchError] = []
+
+    # Two identical slip refs inside the same submission would otherwise both
+    # pass the pre-check and only collide at the database.
+    seen_refs: set[str] = set()
+
+    for index, item in enumerate(payload.entries):
+        try:
+            if item.category_id is not None:
+                _check_category(db, ledger_id, item.category_id)
+
+            if item.slip_ref:
+                if item.slip_ref in seen_refs:
+                    errors.append(
+                        EntryBatchError(
+                            index=index, message="สลิปใบนี้ซ้ำกับอีกแถวในชุดเดียวกัน"
+                        )
+                    )
+                    continue
+                existing = db.execute(
+                    select(Entry).where(
+                        Entry.ledger_id == ledger_id, Entry.slip_ref == item.slip_ref
+                    )
+                ).scalar_one_or_none()
+                if existing is not None:
+                    errors.append(
+                        EntryBatchError(
+                            index=index,
+                            message="สลิปใบนี้ถูกลงในสมุดนี้แล้ว",
+                            duplicate_of_id=existing.id,
+                        )
+                    )
+                    continue
+
+            entry = Entry(
+                ledger_id=ledger_id,
+                occurred_at=item.occurred_at,
+                description=item.description,
+                amount=item.amount,
+                direction=item.direction,
+                category_id=item.category_id,
+                note=item.note,
+                slip_path=item.slip_path,
+                slip_ref=item.slip_ref,
+                source=item.source,
+                ocr_raw_text=item.ocr_raw_text,
+                ocr_confidence=item.ocr_confidence,
+                created_by_id=ctx.user.id,
+                version=1,
+            )
+            db.add(entry)
+            db.commit()
+            if item.slip_ref:
+                seen_refs.add(item.slip_ref)
+            created.append(EntryOut.model_validate(_load(db, ledger_id, entry.id)))
+
+        except HTTPException as exc:
+            db.rollback()
+            detail = exc.detail
+            errors.append(
+                EntryBatchError(
+                    index=index,
+                    message=detail if isinstance(detail, str) else str(detail),
+                )
+            )
+        except IntegrityError:
+            db.rollback()
+            errors.append(
+                EntryBatchError(index=index, message="สลิปใบนี้ถูกลงในสมุดนี้แล้ว")
+            )
+
+    return EntryBatchResult(created=created, errors=errors)
 
 
 @router.post("", response_model=EntryOut, status_code=status.HTTP_201_CREATED)

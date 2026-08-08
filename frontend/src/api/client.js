@@ -182,6 +182,12 @@ export const apiEntries = (ledgerId, filters = {}) =>
 export const apiEntry = (ledgerId, entryId) => api(`/ledgers/${ledgerId}/entries/${entryId}`)
 export const apiCreateEntry = (ledgerId, payload) =>
   api(`/ledgers/${ledgerId}/entries`, { method: 'POST', body: payload })
+
+/** Saves many drafts in one request. Partial success is normal — the response
+ *  carries `created` plus `errors`, each error keyed to the index it arrived
+ *  at, so the caller can leave exactly the failed rows on screen. */
+export const apiCreateEntriesBatch = (ledgerId, entries) =>
+  api(`/ledgers/${ledgerId}/entries/batch`, { method: 'POST', body: { entries } })
 export const apiUpdateEntry = (ledgerId, entryId, payload) =>
   api(`/ledgers/${ledgerId}/entries/${entryId}`, { method: 'PUT', body: payload })
 export const apiDeleteEntry = (ledgerId, entryId) =>

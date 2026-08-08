@@ -6,6 +6,7 @@ import WakeScreen from './components/WakeScreen'
 import { useAuth } from './auth/AuthContext'
 import { LedgerProvider } from './data/LedgerContext'
 import AccountPage from './pages/AccountPage'
+import BatchEntry from './pages/BatchEntry'
 import Entries from './pages/Entries'
 import EntryEdit from './pages/EntryEdit'
 import EntryNew from './pages/EntryNew'
@@ -32,6 +33,7 @@ export default function App() {
         <Route element={<AppShell />}>
           <Route index element={<Entries />} />
           <Route path="new" element={<EntryNew />} />
+          <Route path="batch" element={<BatchEntry />} />
           <Route path="entry/:id" element={<EntryEdit />} />
           <Route path="summary" element={<SummaryPage />} />
           <Route path="members" element={<MembersPage />} />

@@ -133,8 +133,9 @@ uvicorn app.main:app --reload   # http://localhost:8000/docs
 ### เทสต์
 
 ```bash
-python -m tests.smoke          # 126 checks — ทั้ง API บน SQLite ชั่วคราว
+python -m tests.smoke          # 152 checks — ทั้ง API บน SQLite ชั่วคราว
 python -m tests.test_timeutil  # 25 checks — คณิตศาสตร์ timezone
+python -m tests.test_slip_parser  # 40 checks — อ่านยอด/วันที่ พ.ศ./ผู้รับ จากข้อความสลิป
 ```
 
 `tests/smoke.py` เน้นหนักที่ isolation: คนนอกอ่าน/เขียน/ลิสต์/ใช้ category/ขอ signed URL/จัดการสมาชิกไม่ได้ และ entry id ข้ามสมุดไม่ได้
@@ -151,9 +152,31 @@ python -m tests.test_timeutil  # 25 checks — คณิตศาสตร์ ti
 | `GET/POST /ledgers/{id}/members` · `PATCH/DELETE .../{member_id}` | เชิญด้วย username |
 | `GET/POST /ledgers/{id}/categories` · `GET .../suggest?text=` | แยกตามสมุด |
 | `GET/POST /ledgers/{id}/entries` · `GET/PUT/DELETE .../{entry_id}` | PUT ต้องส่ง `version` |
+| `POST /ledgers/{id}/entries/batch` | บันทึกทีละหลายแถว สำเร็จบางส่วนได้ error ผูกกับ index |
 | `GET /ledgers/{id}/entries/summary?month=` | `period` + `lifetime` |
 | `GET /ledgers/{id}/entries/export.csv` | UTF-8 BOM, ป้ายคำเปลี่ยนตามประเภทสมุด |
 | `GET /ledgers/{id}/entries/{id}/slip` · `POST /ledgers/{id}/slips/upload` | |
+
+### เปิด OCR (อ่านสลิปให้อัตโนมัติ)
+
+โค้ดพร้อมแล้ว ขาดแค่ API key
+
+1. สร้าง project ใน Google Cloud → เปิด **Cloud Vision API** → ต้องผูกบัตร (free tier 1,000 ครั้ง/เดือน ซึ่งเหลือเฟือสำหรับสองคน)
+2. สร้าง **API key** แล้วจำกัดให้เรียกได้เฉพาะ Cloud Vision API
+3. ใส่ใน env ของ Render (หรือ `backend/.env` ตอน dev):
+
+```
+OCR_PROVIDER=google
+GOOGLE_VISION_API_KEY=AIza...
+```
+
+**สถาปัตยกรรม** — `GoogleVisionProvider` ทำแค่แปลงรูปเป็นข้อความ ส่วนการตีความว่าข้อความนั้นแปลว่าอะไรอยู่ใน `app/slip_parser.py` ซึ่งเป็น pure function มีเทสต์ของตัวเอง 40 ข้อ แบ่งแบบนี้เพราะ HTTP call ทดสอบไม่ได้ถ้าไม่มี key กับสลิปจริง เลยดันตรรกะออกมาจากฝั่งนั้นให้มากที่สุด
+
+`slip_parser` รู้เรื่องพวกนี้: ป้าย "จำนวนเงิน/ยอดเงิน/บาท/THB", ปี พ.ศ. ทั้งแบบ 2568 และ 68, เดือนไทยย่อทั้งมีจุดและไม่มีจุด (OCR ชอบกินจุด), ชื่อผู้รับหลัง "ไปยัง/ถึง", และ "รหัสอ้างอิง" ซึ่งเอาไปใช้เป็น `slip_ref` กันลงซ้ำ
+
+> ⚠️ **ยังไม่เคยยิงสลิปจริงผ่าน Google Vision** ตัว parser เทสต์ครบ แต่รูปแบบ request/response เขียนจากเอกสาร ต้องลองสลิปจริงสัก 5–10 ใบก่อนถึงจะเชื่อตัวเลขที่มันเติมให้ได้ และ layout ต่างกันไปตามธนาคาร
+
+> QR บนสลิปยังไม่ได้ decode — `pyzbar` ต้องการ `libzbar0` ซึ่งลงบน Render native runtime ไม่ได้ ถ้าจะทำต้อง decode ฝั่ง browser ด้วย `BarcodeDetector`/`jsQR`
 
 ### Timezone
 
@@ -186,6 +209,8 @@ npm run dev                     # http://localhost:5173
 | ≥ 720px | ฟอร์มสองคอลัมน์ · ตัวกรองกางตลอด |
 | ≥ 900px | tab bar → rail ซ้าย |
 
+**เพิ่มหลายรายการรอบเดียว** (`/batch`) — เลือกสลิปหลายใบพร้อมกัน แต่ละใบกลายเป็นแถวร่างที่แก้ได้ อัปโหลดทีละ 2 ใบพร้อมกัน (Render free มี 0.1 vCPU) ไม่มีอะไรลงสมุดจนกว่าจะกด "บันทึกทั้งหมด" สำเร็จบางส่วนได้ — แถวที่ผ่านถูกบันทึก แถวที่มีปัญหาค้างอยู่บนจอพร้อมเหตุผล
+
 **ตาราง vs รายการ** — สลับได้ที่ toolbar จำค่าไว้ใน localStorage
 คอลัมน์ **สะสม** ยึดจากยอดรวมที่ server คำนวณให้ของตัวกรองปัจจุบัน แล้วไล่ย้อนลงมาตามแถว (ใหม่→เก่า) จึงถูกต้องแม้โหลดมาแค่บางส่วน — ป้ายว่า "สะสม" ไม่ใช่ "คงเหลือ" เพราะเวลากรองเดือนอยู่ มันคือยอดสะสมภายในตัวกรองนั้น
 
@@ -210,7 +235,7 @@ npm run check:contrast   # เช็ค WCAG AA 12 คู่สี × 5 ธี�
 
 - **ยังไม่ได้ยืนยัน datetime round-trip บน Postgres จริง** — SQLite แทน `TIMESTAMPTZ` ไม่ได้ (ทิ้ง offset เก็บเป็น local wall-clock text) เลข timezone เองเทสต์ครบใน `tests/test_timeutil.py` แต่ตอนต่อ Neon ครั้งแรกให้ลงรายการตอนดึกๆ (เที่ยงคืน–ตี 7) หนึ่งรายการ แล้วเช็คว่าอยู่ถูกวัน
 - **ยังไม่ได้ทดสอบบนมือถือจริง** — cold start, กล้อง, Add to Home Screen
-- **OCR ยังไม่ต่อ** — `OCR_PROVIDER=none` พอจะต่อ Google Vision แก้ที่ `GoogleVisionProvider.extract()` ที่เดียว ไม่ต้องแตะ schema หรือ frontend
+- **OCR เขียนไว้แล้วแต่ยังไม่เคยยิงสลิปจริง** — ดูหัวข้อ "เปิด OCR" ข้างล่าง
 - **signup เปิดสาธารณะ** — ใครก็สมัครได้ ควรจับตา quota Neon ถ้าเริ่มมีคนแปลกหน้าเข้ามา ถ้าอยากปิด ตัด `/auth/register` แล้วสร้างผู้ใช้ผ่าน `scripts/seed.py`
 - **เชิญแล้วเข้าเลย ไม่มีขั้นตอนตอบรับ** — คนถูกเชิญเห็นสมุดโผล่มาทันที (ออกเองได้)
 - **ไม่มีปุ่มลบบัญชี** — ตั้งใจ ไม่ใช่ลืม รายการที่คุณลงในสมุดคนอื่นมีชื่อคุณกำกับ ลบบัญชีแล้วจะเหลือสองทาง คือรายการหายไปจากสมุดเขา หรือเหลือแถวไม่มีชื่อคนลง ทั้งคู่ไม่ควรเกิดโดยเจ้าของสมุดไม่รู้ ทางที่มีอยู่คือออกจากสมุดคนอื่นเอง แล้วลบสมุดตัวเอง

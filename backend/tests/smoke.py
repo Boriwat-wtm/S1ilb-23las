@@ -422,6 +422,60 @@ check("debt csv uses debt wording", "หนี้เพิ่ม" in body and "�
 cash_csv = client.get(f"/ledgers/{sid}/entries/export.csv", headers=BOW).content.decode("utf-8-sig")
 check("cashflow csv uses cashflow wording", "รายรับ" in cash_csv and "รายจ่าย" in cash_csv)
 
+print("\n== batch create ==")
+batch = {"entries": [
+    {"occurred_at": "2026-08-09T08:00:00", "description": "ชุด 1",
+     "amount": "10", "direction": "out"},
+    {"occurred_at": "2026-08-09T09:00:00", "description": "ชุด 2",
+     "amount": "20", "direction": "in"},
+    {"occurred_at": "2026-08-09T10:00:00", "description": "ชุด 3",
+     "amount": "30", "direction": "out"},
+]}
+r = client.post(f"/ledgers/{sid}/entries/batch", headers=BOW, json=batch)
+check("batch 201", r.status_code == 201, r.text)
+check("all three created", len(r.json()["created"]) == 3, r.text)
+check("no errors", r.json()["errors"] == [], r.text)
+
+# The point of the endpoint: eight good rows must not be lost to two bad ones.
+mixed = {"entries": [
+    {"occurred_at": "2026-08-09T11:00:00", "description": "ดีแถวแรก",
+     "amount": "40", "direction": "out"},
+    {"occurred_at": "2026-08-09T12:00:00", "description": "ซ้ำสลิป",
+     "amount": "50", "direction": "out", "slip_ref": "SCB-REF-0001", "source": "qr"},
+    {"occurred_at": "2026-08-09T13:00:00", "description": "หมวดของสมุดอื่น",
+     "amount": "60", "direction": "out", "category_id": CARD},
+    {"occurred_at": "2026-08-09T14:00:00", "description": "ดีแถวสุดท้าย",
+     "amount": "70", "direction": "out"},
+]}
+r = client.post(f"/ledgers/{sid}/entries/batch", headers=BOW, json=mixed).json()
+check("partial success keeps the good rows", len(r["created"]) == 2, r["created"])
+check("and reports the bad ones", len(r["errors"]) == 2, r["errors"])
+check("errors carry the original index",
+      sorted(e["index"] for e in r["errors"]) == [1, 2], r["errors"])
+check("duplicate error names the original",
+      next(e for e in r["errors"] if e["index"] == 1)["duplicate_of_id"] is not None,
+      r["errors"])
+
+dupe_within = {"entries": [
+    {"occurred_at": "2026-08-09T15:00:00", "description": "ก",
+     "amount": "80", "direction": "out", "slip_ref": "BATCH-DUP-1", "source": "qr"},
+    {"occurred_at": "2026-08-09T16:00:00", "description": "ข",
+     "amount": "90", "direction": "out", "slip_ref": "BATCH-DUP-1", "source": "qr"},
+]}
+r = client.post(f"/ledgers/{sid}/entries/batch", headers=BOW, json=dupe_within).json()
+check("same slip twice inside one batch is caught",
+      len(r["created"]) == 1 and len(r["errors"]) == 1, r)
+
+check("empty batch -> 422", client.post(
+    f"/ledgers/{sid}/entries/batch", headers=BOW, json={"entries": []}).status_code == 422)
+check("over the batch cap -> 422", client.post(
+    f"/ledgers/{sid}/entries/batch", headers=BOW,
+    json={"entries": [batch["entries"][0]] * 51}).status_code == 422)
+check("a viewer cannot batch-create", client.post(
+    f"/ledgers/{sid}/entries/batch", headers=MAL, json=batch).status_code in (403, 404))
+check("a non-member cannot batch-create into someone else's book", client.post(
+    f"/ledgers/{pid}/entries/batch", headers=MAL, json=batch).status_code == 404)
+
 print("\n== slips (storage disabled) ==")
 check("undecodable image -> 400, never 500", client.post(
     f"/ledgers/{sid}/slips/upload", headers=BOW,

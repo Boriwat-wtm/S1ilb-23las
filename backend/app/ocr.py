@@ -21,12 +21,16 @@ still have to come from OCR or from a slip-verification API.
 """
 
 import asyncio
+import base64
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 from typing import Protocol
 
+import httpx
+
 from .config import settings
+from .slip_parser import confidence_for, parse_slip_text
 
 EXTRACT_TIMEOUT_SECONDS = 15.0
 
@@ -76,29 +80,85 @@ class NullProvider:
 
 
 class GoogleVisionProvider:
-    """Placeholder for Google Cloud Vision `DOCUMENT_TEXT_DETECTION`.
+    """Google Cloud Vision, DOCUMENT_TEXT_DETECTION.
 
-    Sketch for when this gets built:
-      1. POST the JPEG (base64) to
-         https://vision.googleapis.com/v1/images:annotate?key=<API_KEY>
-      2. Take `responses[0].fullTextAnnotation.text` as `raw_text`.
-      3. Regex the amount (largest THB-looking number, usually the biggest
-         glyphs on the slip) and the Thai/So-lar date, and set
-         source="ocr" with confidence based on how many fields parsed.
-      4. Anything unparsed stays None — the form asks the user.
+    Deliberately thin. All it does is turn an image into text; every judgement
+    about what that text means lives in app/slip_parser.py, which is a pure
+    function with its own tests. That split is the point — the HTTP call
+    cannot be tested without a key and a pile of real slips, so as little
+    logic as possible sits on this side of the line.
 
     Free tier is 1,000 units/month, comfortably above a two-person household,
-    but it does require a GCP project with billing enabled.
+    but it needs a GCP project with billing enabled.
+
+    NOT YET EXERCISED AGAINST A REAL SLIP. The parser is well covered; this
+    request/response shape is written from the API docs and needs one real
+    photograph through it before anyone should trust the numbers it fills in.
     """
 
     name = "google"
+    endpoint = "https://vision.googleapis.com/v1/images:annotate"
 
     async def extract(self, image_bytes: bytes) -> SlipExtraction:
+        if not settings.google_vision_api_key:
+            return SlipExtraction(
+                provider=self.name,
+                error="ยังไม่ได้ใส่ GOOGLE_VISION_API_KEY — กรอกเองไปก่อน",
+            )
+
+        payload = {
+            "requests": [
+                {
+                    "image": {"content": base64.b64encode(image_bytes).decode("ascii")},
+                    "features": [{"type": "DOCUMENT_TEXT_DETECTION"}],
+                    # Thai first, English second: slips mix both, and the hint
+                    # order matters for how Vision segments the lines.
+                    "imageContext": {"languageHints": ["th", "en"]},
+                }
+            ]
+        }
+
+        async with httpx.AsyncClient(timeout=EXTRACT_TIMEOUT_SECONDS - 2) as client:
+            resp = await client.post(
+                self.endpoint,
+                params={"key": settings.google_vision_api_key},
+                json=payload,
+            )
+
+        if resp.status_code != 200:
+            return SlipExtraction(
+                provider=self.name,
+                error=f"Google Vision ตอบ {resp.status_code} — กรอกเองไปก่อน",
+            )
+
+        body = resp.json()
+        first = (body.get("responses") or [{}])[0]
+        if "error" in first:
+            return SlipExtraction(
+                provider=self.name,
+                error=f"Google Vision: {first['error'].get('message', 'unknown')} — กรอกเองไปก่อน",
+            )
+
+        text = (first.get("fullTextAnnotation") or {}).get("text", "")
+        if not text.strip():
+            return SlipExtraction(
+                provider=self.name,
+                raw_text=text or None,
+                error="อ่านตัวหนังสือจากรูปไม่ได้เลย — กรอกเอง",
+            )
+
+        parsed = parse_slip_text(text)
         return SlipExtraction(
+            amount=parsed["amount"],
+            occurred_at=parsed["occurred_at"],
+            description=parsed["description"],
+            # The reference goes in as slip_ref, which is what stops the same
+            # slip being filed twice in one ledger.
+            slip_ref=parsed["reference"],
+            raw_text=text,
             provider=self.name,
-            source="manual",
-            confidence="low",
-            error="ยังไม่ได้ต่อ Google Vision — กรอกเองไปก่อน",
+            source="ocr" if (parsed["amount"] or parsed["occurred_at"]) else "manual",
+            confidence=confidence_for(parsed),
         )
 
 

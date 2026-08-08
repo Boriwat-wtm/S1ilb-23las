@@ -237,10 +237,16 @@ export default function Entries() {
         <span className="spacer" />
 
         {canEdit && (
-          <Link className="btn btn-primary btn-sm" to="/new">
-            <Icon name="plus" size={16} />
-            เพิ่มรายการ
-          </Link>
+          <>
+            <Link className="btn btn-sm" to="/batch" title="เพิ่มหลายรายการพร้อมกัน">
+              <Icon name="camera" size={15} />
+              หลายรายการ
+            </Link>
+            <Link className="btn btn-primary btn-sm" to="/new">
+              <Icon name="plus" size={16} />
+              เพิ่มรายการ
+            </Link>
+          </>
         )}
       </div>
 

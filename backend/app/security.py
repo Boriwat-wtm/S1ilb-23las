@@ -19,13 +19,31 @@ def verify_password(plain: str, hashed: str) -> bool:
         return False
 
 
-def create_access_token(user_id: int, username: str) -> tuple[str, datetime]:
-    expires_at = datetime.now(timezone.utc) + timedelta(days=settings.jwt_expire_days)
+def password_stamp(changed_at: datetime) -> int:
+    """Microsecond stamp identifying one particular password.
+
+    Tokens carry this and it is compared for *equality*, not for order. The
+    obvious design — compare the token's `iat` against password_changed_at —
+    has a one-second hole in it, because PyJWT floors `iat` to whole seconds:
+    a token minted in the same second as a password change compares equal and
+    survives the change. Equality on a microsecond stamp has no such window.
+    """
+    if changed_at.tzinfo is None:
+        changed_at = changed_at.replace(tzinfo=timezone.utc)
+    return int(changed_at.timestamp() * 1_000_000)
+
+
+def create_access_token(
+    user_id: int, username: str, changed_at: datetime
+) -> tuple[str, datetime]:
+    now = datetime.now(timezone.utc)
+    expires_at = now + timedelta(days=settings.jwt_expire_days)
     payload = {
         "sub": str(user_id),
         "username": username,
+        "pwc": password_stamp(changed_at),
         "exp": expires_at,
-        "iat": datetime.now(timezone.utc),
+        "iat": now,
     }
     token = jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
     return token, expires_at

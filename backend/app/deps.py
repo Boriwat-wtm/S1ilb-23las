@@ -10,7 +10,6 @@ exists, which is enough to enumerate other people's private books.
 """
 
 from dataclasses import dataclass
-from datetime import timezone
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
@@ -20,7 +19,7 @@ from sqlalchemy.orm import Session
 
 from .database import get_db
 from .models import CAN_ADMIN, CAN_EDIT, Ledger, LedgerMember, User
-from .security import decode_access_token
+from .security import decode_access_token, password_stamp
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -53,21 +52,16 @@ def get_current_user(
     if user is None:
         raise unauthorized
 
-    # Tokens issued before the last password change are dead.
+    # Tokens minted against an older password are dead. Equality on the
+    # microsecond stamp, not an ordering test against `iat` — see
+    # security.password_stamp for the one-second hole that avoids.
     #
-    # The tzinfo guard is not defensive padding. A naive datetime's
-    # .timestamp() is interpreted as *local* time, so on a UTC+7 machine the
-    # cutoff would land seven hours in the past and every stale token would
-    # sail through — a security check failing open, silently. Postgres hands
-    # back an aware value and this is a no-op; the guard means correctness does
-    # not depend on that.
-    #
-    # Both sides floor to whole seconds because PyJWT truncates `iat`; without
-    # it the token minted by a password change would fail its own check.
-    changed_at = user.password_changed_at
-    if changed_at.tzinfo is None:
-        changed_at = changed_at.replace(tzinfo=timezone.utc)
-    if int(payload.get("iat", 0)) < int(changed_at.timestamp()):
+    # The tzinfo normalisation inside password_stamp is not padding either: a
+    # naive datetime's .timestamp() is read as *local* time, so on a UTC+7
+    # machine the two sides would differ by seven hours and every token would
+    # be rejected. Postgres returns an aware value and it is a no-op; the
+    # guard means correctness does not depend on the driver.
+    if payload.get("pwc") != password_stamp(user.password_changed_at):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="รหัสผ่านถูกเปลี่ยนแล้ว กรุณาเข้าสู่ระบบใหม่",
